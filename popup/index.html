@@ -12,48 +12,54 @@
     <div class="onboard-brand-box">
       <div class="brand-icon-box-lg">⚡</div>
       <h1 class="onboard-brand-title">LeetSync <span class="brand-tag">SQUADS</span></h1>
-      <p class="onboard-brand-sub">Your intelligent DSA coding companion and squad competition layer.</p>
+      <p class="onboard-brand-sub">Connect your GitHub to unlock roadmaps, live streaks, and automatic solution sync.</p>
     </div>
 
-    <div class="onboard-features-list">
-      <div class="onboard-feature-item">
-        <span class="feature-icon">🐙</span>
-        <div class="feature-text">
-          <div class="feature-head">Automatic GitHub Sync</div>
-          <div class="feature-desc">Every accepted LeetCode solution automatically backed up with clean READMEs.</div>
+    <!-- Step-by-Step Visual Instruction Card -->
+    <div class="onboard-instructions-card">
+      <div class="instructions-header">
+        <span class="instructions-badge">QUICK SETUP</span>
+        <span class="instructions-time">Takes ~15 seconds</span>
+      </div>
+
+      <div class="step-row">
+        <div class="step-num-badge">1</div>
+        <div class="step-content">
+          <div class="step-title">Authorize on GitHub</div>
+          <div class="step-detail">Click the button below. All scopes and permissions are already pre-selected for you. Scroll down and click <b>Generate token</b>.</div>
         </div>
       </div>
 
-      <div class="onboard-feature-item">
-        <span class="feature-icon">🔥</span>
-        <div class="feature-text">
-          <div class="feature-head">Streak & Roadmaps</div>
-          <div class="feature-desc">Track momentum and practice curated Blind 75 and NeetCode 150 problems.</div>
+      <div class="step-row">
+        <div class="step-num-badge">2</div>
+        <div class="step-content">
+          <div class="step-title">Copy your Token</div>
+          <div class="step-detail">Click the 📋 copy button next to your new token (starts with <code>ghp_...</code>).</div>
         </div>
       </div>
 
-      <div class="onboard-feature-item">
-        <span class="feature-icon">⚔️</span>
-        <div class="feature-text">
-          <div class="feature-head">Multiplayer Squad Duels</div>
-          <div class="feature-desc">Compete with squad mates in live 1v1 speed problem races.</div>
+      <div class="step-row">
+        <div class="step-num-badge">3</div>
+        <div class="step-content">
+          <div class="step-title">Paste & Unlock</div>
+          <div class="step-detail">Paste it below and click <b>Unlock</b>. LeetSync will auto-create your solutions repository!</div>
         </div>
       </div>
     </div>
 
     <div class="onboard-cta-section">
-      <!-- Direct 1-Click Connect Button -->
+      <!-- Step 1 Button -->
       <button class="btn-cta-solve onboard-primary-btn" id="btn-onboard-connect-oauth">
         <span>🐙</span>
-        <span>1. Authorize on GitHub ↗</span>
+        <span>1. Open GitHub & Generate Token ↗</span>
       </button>
 
-      <!-- Step 2: Instant Paste & Unlock -->
-      <div class="form-field-group" style="width: 100%; margin-top: 4px;">
+      <!-- Step 2 Input & Unlock Button -->
+      <div class="form-field-group" style="width: 100%; margin-top: 2px;">
         <label class="field-label">2. Paste Token to Unlock:</label>
         <div style="display: flex; gap: 6px;">
           <input type="password" id="input-onboard-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" class="input-flat" style="flex: 1;">
-          <button class="btn-cta-solve" id="btn-onboard-submit-token" style="padding: 6px 12px; font-weight: 600;">Unlock ⚡</button>
+          <button class="btn-cta-solve" id="btn-onboard-submit-token" style="padding: 6px 14px; font-weight: 700;">Unlock ⚡</button>
         </div>
       </div>
 
