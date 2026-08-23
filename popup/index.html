@@ -42,26 +42,22 @@
     </div>
 
     <div class="onboard-cta-section">
+      <!-- Direct 1-Click Connect Button -->
       <button class="btn-cta-solve onboard-primary-btn" id="btn-onboard-connect-oauth">
         <span>🐙</span>
-        <span>Connect with GitHub</span>
+        <span>1. Authorize on GitHub ↗</span>
       </button>
 
-      <div class="onboard-divider"><span>OR</span></div>
-
-      <!-- Quick Inline Token Entry for instant access -->
-      <div class="form-field-group" style="width: 100%;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-          <label class="field-label">Personal Access Token (PAT):</label>
-          <a href="https://github.com/settings/tokens/new?description=LeetSync+Squads&scopes=repo" target="_blank" style="font-size: 11px; color: var(--accent-blue); text-decoration: none;">Create Token ↗</a>
-        </div>
+      <!-- Step 2: Instant Paste & Unlock -->
+      <div class="form-field-group" style="width: 100%; margin-top: 4px;">
+        <label class="field-label">2. Paste Token to Unlock:</label>
         <div style="display: flex; gap: 6px;">
-          <input type="password" id="input-onboard-token" placeholder="ghp_xxxxxxxxxxxx" class="input-flat" style="flex: 1;">
-          <button class="btn-secondary-flat" id="btn-onboard-submit-token" style="padding: 6px 12px; font-weight: 600;">Link →</button>
+          <input type="password" id="input-onboard-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" class="input-flat" style="flex: 1;">
+          <button class="btn-cta-solve" id="btn-onboard-submit-token" style="padding: 6px 12px; font-weight: 600;">Unlock ⚡</button>
         </div>
       </div>
 
-      <div class="backfill-msg" id="onboard-status-msg" style="text-align: center; margin-top: 4px;"></div>
+      <div class="backfill-msg" id="onboard-status-msg" style="text-align: center; margin-top: 2px;"></div>
     </div>
   </div>
 

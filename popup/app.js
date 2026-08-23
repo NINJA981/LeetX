@@ -588,22 +588,18 @@ async function handleLinkToken(token) {
  * Setup Event Listeners for buttons and forms.
  */
 function setupEventListeners() {
-  // Onboarding OAuth Button
-  document.getElementById('btn-onboard-connect-oauth')?.addEventListener('click', async () => {
+  // 1. Authorize on GitHub Button: Opens GitHub token generation with repo scope in a new tab
+  document.getElementById('btn-onboard-connect-oauth')?.addEventListener('click', () => {
+    const authUrl = 'https://github.com/settings/tokens/new?description=LeetSync+Squads&scopes=repo';
+    window.open(authUrl, '_blank');
     const statusEl = document.getElementById('onboard-status-msg');
-    if (statusEl) statusEl.innerText = 'Opening GitHub authorization...';
-    try {
-      const token = await GitHubAPI.launchOAuthFlow();
-      await handleLinkToken(token);
-    } catch (err) {
-      if (statusEl) {
-        statusEl.innerText = 'Tip: Paste your token below for instant 1-click access!';
-        statusEl.style.color = 'var(--accent-blue)';
-      }
+    if (statusEl) {
+      statusEl.innerText = 'Click "Generate token" on GitHub, then paste below to unlock!';
+      statusEl.style.color = 'var(--accent-blue)';
     }
   });
 
-  // Onboarding Submit PAT Button
+  // 2. Unlock Token Submit Button
   document.getElementById('btn-onboard-submit-token')?.addEventListener('click', () => {
     const token = document.getElementById('input-onboard-token').value;
     handleLinkToken(token);
