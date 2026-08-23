@@ -1417,3 +1417,105 @@ body {
   font-family: var(--font-mono);
   font-size: 10px;
 }
+
+/* Segmented Roadmap Switcher */
+.roadmap-segmented-wrap {
+  display: flex;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-main);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.roadmap-segment-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roadmap-segment-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.roadmap-segment-btn.active {
+  background: #FFFFFF;
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--border-main);
+}
+
+.roadmap-segment-btn .seg-icon {
+  font-size: 13px;
+}
+
+.roadmap-segment-btn .seg-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  padding: 1px 5px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.roadmap-segment-btn.active .seg-badge {
+  background: var(--accent-dark);
+  color: #FFFFFF;
+}
+
+.roadmap-title-active {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Category Pill Strip with Smooth Overflow */
+.category-pill-strip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  padding: 2px 2px 4px 2px;
+  -webkit-overflow-scrolling: touch;
+}
+.category-pill-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.cat-pill-btn {
+  padding: 4px 10px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-main);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.12s ease;
+}
+.cat-pill-btn:hover {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+}
+.cat-pill-btn.active {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+  color: #FFFFFF;
+  font-weight: 600;
+}

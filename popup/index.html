@@ -336,12 +336,23 @@
 
       <!-- 4. ROADMAP VIEW -->
       <section id="view-roadmap" class="tab-view">
+        <!-- Prominent Segmented Roadmap Switcher -->
+        <div class="roadmap-segmented-wrap">
+          <button class="roadmap-segment-btn active" id="btn-roadmap-blind75" data-type="blind75">
+            <span class="seg-icon">⚡</span>
+            <span class="seg-name">Blind 75</span>
+            <span class="seg-badge">75</span>
+          </button>
+          <button class="roadmap-segment-btn" id="btn-roadmap-neetcode150" data-type="neetcode150">
+            <span class="seg-icon">🚀</span>
+            <span class="seg-name">NeetCode 150</span>
+            <span class="seg-badge">150</span>
+          </button>
+        </div>
+
         <div class="roadmap-hero-panel">
           <div class="roadmap-top-bar">
-            <select id="roadmap-type-select" class="select-flat" style="font-weight: 600; width: auto; padding: 3px 6px;">
-              <option value="blind75">Blind 75 Roadmap (75)</option>
-              <option value="neetcode150">NeetCode 150 Roadmap (75+)</option>
-            </select>
+            <span class="roadmap-title-active" id="roadmap-active-title">Blind 75 Curated List</span>
             <span class="section-subtext" id="blind75-count">0 / 75 Solved</span>
           </div>
           <div class="progress-track">

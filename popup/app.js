@@ -339,6 +339,16 @@ async function checkDueReviews() {
 async function loadRoadmap(type = 'blind75') {
   currentRoadmapType = type;
   const fileName = type === 'neetcode150' ? 'neetcode150.json' : 'blind75.json';
+  const titleEl = document.getElementById('roadmap-active-title');
+  if (titleEl) {
+    titleEl.innerText = type === 'neetcode150' ? 'NeetCode 150 Master List' : 'Blind 75 Curated List';
+  }
+
+  // Update active segmented button
+  document.querySelectorAll('.roadmap-segment-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === type);
+  });
+
   try {
     const response = await fetch(chrome.runtime.getURL(`assets/data/${fileName}`));
     currentRoadmapData = await response.json();
@@ -617,9 +627,12 @@ function setupEventListeners() {
     document.getElementById('btn-backfill-all')?.click();
   });
 
-  // Roadmap Selector Dropdown
-  document.getElementById('roadmap-type-select')?.addEventListener('change', (e) => {
-    loadRoadmap(e.target.value);
+  // Segmented Roadmap Switcher Buttons (Blind 75 vs NeetCode 150)
+  document.querySelectorAll('.roadmap-segment-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const type = e.currentTarget.dataset.type;
+      loadRoadmap(type);
+    });
   });
 
   // Leave / Reset Squad Button
