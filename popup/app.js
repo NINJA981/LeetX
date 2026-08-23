@@ -110,18 +110,17 @@ async function loadStoredState() {
 
   // Header badges
   document.getElementById('header-streak-count').innerText = streak;
-  document.getElementById('header-xp-val').innerText = xp;
+  document.getElementById('header-xp-val').innerText = xp.toLocaleString();
 
-  // Hero Momentum Strip
-  const streakTitle = document.getElementById('momentum-streak-title');
+  // Hero Momentum Headline
+  const streakNum = document.getElementById('momentum-streak-number');
   const streakDesc = document.getElementById('momentum-streak-desc');
   const statusText = document.getElementById('today-status-text');
 
+  streakNum.innerText = streak;
   if (streak === 0) {
-    streakTitle.innerText = '0 Day Streak';
     streakDesc.innerText = "Solve today's challenge to ignite your streak.";
   } else {
-    streakTitle.innerText = `${streak} Day Streak 🔥`;
     streakDesc.innerText = todaySolved > 0 ? "You're all done for today! Momentum preserved." : "Keep the flame burning. Complete today's problem.";
   }
 
@@ -187,17 +186,17 @@ function renderWeekStrip(streak, isTodaySolved) {
     const dot = document.getElementById(`dot-day-${i}`);
     if (!dot) continue;
 
-    dot.className = 'day-dot';
+    dot.className = 'day-circle';
     dot.innerText = '';
 
     if (i === dayOfWeek) {
-      dot.classList.add('today');
+      dot.classList.add('today-ring');
       if (isTodaySolved) {
-        dot.classList.add('completed');
+        dot.classList.add('done');
         dot.innerText = '✓';
       }
     } else if (i < dayOfWeek && i >= dayOfWeek - streak + (isTodaySolved ? 1 : 0)) {
-      dot.classList.add('completed');
+      dot.classList.add('done');
       dot.innerText = '✓';
     }
   }
@@ -264,7 +263,7 @@ async function loadDailyChallenge() {
       const badge = document.getElementById('daily-diff-badge');
       const diff = daily.question.difficulty || 'Medium';
       badge.innerText = diff;
-      badge.className = `diff-badge ${diff}`;
+      badge.className = `diff-tag ${diff}`;
 
       const launchBtn = document.getElementById('daily-launch-btn');
       launchBtn.href = daily.link;
@@ -302,18 +301,18 @@ function renderRoadmapList(categoryFilter = 'all') {
 
   filtered.forEach(prob => {
     const itemEl = document.createElement('div');
-    itemEl.className = 'roadmap-row';
+    itemEl.className = 'roadmap-item-row';
     const isSolved = userSolvedSlugs.has(prob.slug);
     if (isSolved) solvedCount++;
 
     itemEl.innerHTML = `
-      <div class="prob-left">
-        <span class="prob-id">#${prob.id}</span>
-        <a href="https://leetcode.com/problems/${prob.slug}/" target="_blank" class="prob-title-link">${prob.title}</a>
+      <div class="item-left-desc">
+        <span class="item-id-tag">#${prob.id}</span>
+        <a href="https://leetcode.com/problems/${prob.slug}/" target="_blank" class="item-title-link">${prob.title}</a>
       </div>
-      <div style="display: flex; align-items: center; gap: 6px;">
+      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
         ${isSolved ? '<span style="color: var(--color-easy); font-size: 11px; font-weight: 600; font-family: var(--font-mono);">✓ Solved</span>' : ''}
-        <span class="diff-badge ${prob.difficulty}">${prob.difficulty}</span>
+        <span class="diff-tag ${prob.difficulty}">${prob.difficulty}</span>
       </div>
     `;
 
@@ -373,26 +372,26 @@ async function renderSquad(squadCode, currentStreak = 0, currentTodaySolved = 0,
 
   members.forEach((m, idx) => {
     const row = document.createElement('div');
-    row.className = `leaderboard-row ${m.username === username ? 'current-user' : ''}`;
+    row.className = `leaderboard-member-row ${m.username === username ? 'is-current' : ''}`;
     const isSolved = (m.todaySolved || 0) > 0;
     const rankNum = String(idx + 1).padStart(2, '0');
 
     row.innerHTML = `
-      <div class="member-left">
-        <span class="member-rank">${rankNum}</span>
-        <span class="member-name">@${m.username}</span>
-        <span class="member-streak-badge">🔥 ${m.streak || 0}d</span>
+      <div class="member-left-side">
+        <span class="member-rank-num">${rankNum}</span>
+        <span class="member-handle">@${m.username}</span>
+        <span class="member-streak-flame">🔥 ${m.streak || 0}d</span>
       </div>
-      <div class="member-right">
-        <span class="member-status ${isSolved ? 'done' : 'pending'}">${isSolved ? '✓ Done' : '⏳ Pending'}</span>
-        ${!isSolved && m.username !== username ? `<button class="btn-nudge" data-user="${m.username}" title="Nudge">👋</button>` : ''}
+      <div class="member-right-side">
+        <span class="status-pill-mini ${isSolved ? 'done' : 'pending'}">${isSolved ? '✓ Done' : '⏳ Pending'}</span>
+        ${!isSolved && m.username !== username ? `<button class="btn-nudge-mini" data-user="${m.username}" title="Nudge">👋</button>` : ''}
       </div>
     `;
     listEl.appendChild(row);
   });
 
   // Attach Nudge events
-  document.querySelectorAll('.btn-nudge').forEach(btn => {
+  document.querySelectorAll('.btn-nudge-mini').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const targetUser = e.currentTarget.dataset.user;
       await FirebaseSquads.sendNudge(squadCode, username, targetUser, '👋');
@@ -407,12 +406,12 @@ async function renderSquad(squadCode, currentStreak = 0, currentTodaySolved = 0,
   const activities = (rawSquad.activityFeed || []).filter(a => !a.text.includes('AH0C') && !a.text.includes('You')).slice(0, 5);
 
   if (activities.length === 0) {
-    feedEl.innerHTML = `<div class="activity-empty">${username} joined the squad! Solve a problem to light up the feed.</div>`;
+    feedEl.innerHTML = `<div class="activity-bubble">● ${username} joined the squad · just now</div>`;
   } else {
     activities.forEach(act => {
       const item = document.createElement('div');
-      item.className = 'activity-item';
-      item.innerText = act.text;
+      item.className = 'activity-bubble';
+      item.innerText = `● ${act.text}`;
       feedEl.appendChild(item);
     });
   }
@@ -467,7 +466,7 @@ function setupEventListeners() {
       });
       document.getElementById('header-streak-count').innerText = 0;
       document.getElementById('header-xp-val').innerText = 0;
-      document.getElementById('momentum-streak-title').innerText = '0 Day Streak';
+      document.getElementById('momentum-streak-number').innerText = '0';
       document.getElementById('momentum-streak-desc').innerText = "Solve today's challenge to ignite your streak.";
       document.getElementById('today-status-text').innerText = 'Pending ⏳';
       document.getElementById('today-status-text').style.color = 'var(--color-med)';
@@ -591,9 +590,9 @@ function setupEventListeners() {
   });
 
   // Roadmap Category Filter Pills
-  document.querySelectorAll('.filter-pill').forEach(pill => {
+  document.querySelectorAll('.cat-pill-btn').forEach(pill => {
     pill.addEventListener('click', (e) => {
-      document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.cat-pill-btn').forEach(p => p.classList.remove('active'));
       e.currentTarget.classList.add('active');
       renderRoadmapList(e.currentTarget.dataset.cat);
     });
