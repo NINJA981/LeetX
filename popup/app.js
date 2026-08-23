@@ -1,6 +1,6 @@
 /**
  * LeetSync Squads - Coding Progress Companion Engine
- * Non-blocking architecture: Zero window.prompt/alert modal locks, instant toast feedback, and auto repo provisioning.
+ * Gateway Architecture: Unlocks full application only after GitHub is connected.
  */
 
 import { LeetCodeAPI } from '../scripts/leetcode.js';
@@ -36,13 +36,34 @@ function showToast(msg) {
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', async () => {
   setupTabs();
-  await loadStoredState();
-  await syncLiveLeetCodeSession();
-  await loadDailyChallenge();
-  await loadRoadmap(currentRoadmapType);
-  await checkDueReviews();
+  await checkAuthAndInitialize();
   setupEventListeners();
 });
+
+/**
+ * Gatekeeper: Show Onboarding if not connected, else show Main App.
+ */
+async function checkAuthAndInitialize() {
+  const data = await chrome.storage.local.get(['github_token', 'github_repo_owner']);
+  const onboardingEl = document.getElementById('onboarding-container');
+  const appEl = document.getElementById('app-container');
+
+  if (!data.github_token) {
+    // Show Onboarding Screen
+    if (onboardingEl) onboardingEl.style.display = 'flex';
+    if (appEl) appEl.style.display = 'none';
+  } else {
+    // Show Main App Screen
+    if (onboardingEl) onboardingEl.style.display = 'none';
+    if (appEl) appEl.style.display = 'flex';
+
+    await loadStoredState();
+    await syncLiveLeetCodeSession();
+    await loadDailyChallenge();
+    await loadRoadmap(currentRoadmapType);
+    await checkDueReviews();
+  }
+}
 
 /**
  * Setup Tab Navigation switching.
@@ -155,44 +176,13 @@ async function loadStoredState() {
   // GitHub Connection State
   const repoNameEl = document.getElementById('sync-repo-name');
   const indicator = document.getElementById('github-sync-indicator');
-  const disconnectedBox = document.getElementById('github-disconnected-box');
-  const connectedBox = document.getElementById('github-connected-box');
-  const connBadge = document.getElementById('settings-conn-badge');
-  const disconnectBtn = document.getElementById('btn-disconnect-github');
+  const activeRepoInput = document.getElementById('input-active-repo');
 
   if (data.github_token && data.github_repo_owner && data.github_repo_name) {
     repoNameEl.innerText = `${data.github_repo_owner}/${data.github_repo_name}`;
     indicator.innerText = '● Connected';
     indicator.style.color = 'var(--color-easy)';
-    if (disconnectedBox) disconnectedBox.style.display = 'none';
-    if (connectedBox) connectedBox.style.display = 'block';
-
-    if (connBadge) {
-      connBadge.innerText = `● Connected as @${data.github_repo_owner}`;
-      connBadge.style.color = 'var(--color-easy)';
-    }
-    if (disconnectBtn) disconnectBtn.style.display = 'inline-block';
-  } else {
-    repoNameEl.innerText = 'Not Connected';
-    indicator.innerText = '● Standby';
-    indicator.style.color = 'var(--text-muted)';
-    if (disconnectedBox) disconnectedBox.style.display = 'block';
-    if (connectedBox) connectedBox.style.display = 'none';
-
-    if (connBadge) {
-      connBadge.innerText = '● Not Connected';
-      connBadge.style.color = 'var(--text-muted)';
-    }
-    if (disconnectBtn) disconnectBtn.style.display = 'none';
-  }
-
-  // Settings inputs
-  if (data.github_token) {
-    document.getElementById('input-github-token').value = data.github_token;
-    await populateRepoDropdown(data.github_token, data.github_repo_name);
-  }
-  if (data.github_branch) {
-    document.getElementById('input-github-branch').value = data.github_branch;
+    if (activeRepoInput) activeRepoInput.value = `${data.github_repo_owner}/${data.github_repo_name}`;
   }
 
   // Squad State
@@ -553,26 +543,82 @@ async function renderSquad(squadCode, currentStreak = 0, currentTodaySolved = 0,
 }
 
 /**
+ * Handle Onboarding Token Link & Repo Auto-Creation.
+ */
+async function handleLinkToken(token) {
+  const statusEl = document.getElementById('onboard-status-msg');
+  if (!token || !token.trim()) {
+    if (statusEl) {
+      statusEl.innerText = 'Please enter a valid GitHub token.';
+      statusEl.style.color = 'var(--color-hard)';
+    }
+    return;
+  }
+
+  token = token.trim();
+  if (statusEl) {
+    statusEl.innerText = 'Verifying GitHub account & setting up repository...';
+    statusEl.style.color = 'var(--text-secondary)';
+  }
+
+  try {
+    const gh = new GitHubAPI(token);
+    const { owner, isNew } = await gh.ensureRepository('leetcode-submissions');
+
+    await chrome.storage.local.set({
+      github_token: token,
+      github_repo_owner: owner,
+      github_repo_name: 'leetcode-submissions',
+      github_branch: 'main',
+      display_name: owner,
+    });
+
+    showToast(`✓ Welcome @${owner}!`);
+    await checkAuthAndInitialize();
+  } catch (err) {
+    console.error('Connection error:', err);
+    if (statusEl) {
+      statusEl.innerText = `Error: ${err.message}`;
+      statusEl.style.color = 'var(--color-hard)';
+    }
+  }
+}
+
+/**
  * Setup Event Listeners for buttons and forms.
  */
 function setupEventListeners() {
-  // Quick connect button on Stats view switches to Settings tab
-  document.getElementById('btn-quick-connect-github')?.addEventListener('click', () => {
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
-    const settingsTab = document.querySelector('.nav-tab[data-tab="settings"]');
-    const settingsView = document.getElementById('view-settings');
-    if (settingsTab) settingsTab.classList.add('active');
-    if (settingsView) settingsView.classList.add('active');
+  // Onboarding OAuth Button
+  document.getElementById('btn-onboard-connect-oauth')?.addEventListener('click', async () => {
+    const statusEl = document.getElementById('onboard-status-msg');
+    if (statusEl) statusEl.innerText = 'Opening GitHub authorization...';
+    try {
+      const token = await GitHubAPI.launchOAuthFlow();
+      await handleLinkToken(token);
+    } catch (err) {
+      if (statusEl) {
+        statusEl.innerText = 'Tip: Paste your token below for instant 1-click access!';
+        statusEl.style.color = 'var(--accent-blue)';
+      }
+    }
   });
 
-  // Disconnect GitHub Button (Pure non-blocking)
+  // Onboarding Submit PAT Button
+  document.getElementById('btn-onboard-submit-token')?.addEventListener('click', () => {
+    const token = document.getElementById('input-onboard-token').value;
+    handleLinkToken(token);
+  });
+
+  // Disconnect GitHub Button
   document.getElementById('btn-disconnect-github')?.addEventListener('click', async () => {
     await chrome.storage.local.remove(['github_token', 'github_repo_owner', 'github_repo_name']);
-    document.getElementById('input-github-token').value = '';
-    document.getElementById('auth-status-msg').innerText = 'GitHub disconnected.';
     showToast('GitHub disconnected');
-    await loadStoredState();
+    await checkAuthAndInitialize();
+  });
+
+  // Save Settings
+  document.getElementById('btn-settings-sync-now')?.addEventListener('click', () => {
+    document.getElementById('btn-backfill-all')?.click();
   });
 
   // Roadmap Selector Dropdown
@@ -635,7 +681,7 @@ function setupEventListeners() {
     });
   });
 
-  // Reset Streak & XP Button (Pure non-blocking)
+  // Reset Streak & XP Button
   document.getElementById('btn-reset-streak')?.addEventListener('click', async () => {
     await chrome.storage.local.set({
       streak_count: 0,
@@ -711,47 +757,6 @@ function setupEventListeners() {
     }
   });
 
-  // Link GitHub Account & Auto-Create leetcode-submissions Repo (Non-blocking)
-  document.getElementById('btn-save-settings')?.addEventListener('click', async () => {
-    const displayName = document.getElementById('input-display-name').value.trim() || 'NINJA981';
-    const token = document.getElementById('input-github-token').value.trim();
-    const branch = document.getElementById('input-github-branch').value.trim() || 'main';
-    const statusEl = document.getElementById('auth-status-msg');
-
-    currentUsername = displayName;
-
-    if (!token) {
-      statusEl.innerText = 'Please paste your GitHub Personal Access Token first.';
-      statusEl.style.color = 'var(--color-hard)';
-      return;
-    }
-
-    statusEl.innerText = 'Validating GitHub token & ensuring repository...';
-    statusEl.style.color = 'var(--text-secondary)';
-
-    try {
-      const gh = new GitHubAPI(token);
-      const { owner, isNew } = await gh.ensureRepository('leetcode-submissions');
-
-      await chrome.storage.local.set({
-        display_name: displayName,
-        github_token: token,
-        github_repo_owner: owner,
-        github_repo_name: 'leetcode-submissions',
-        github_branch: branch,
-      });
-
-      statusEl.innerText = `✓ Linked ${owner}/leetcode-submissions (${isNew ? 'Created new' : 'Found existing'})`;
-      statusEl.style.color = 'var(--color-easy)';
-      showToast(`✓ Connected to ${owner}/leetcode-submissions!`);
-      await loadStoredState();
-    } catch (err) {
-      console.warn('GitHub validation notice:', err.message);
-      statusEl.innerText = `Error: ${err.message}`;
-      statusEl.style.color = 'var(--color-hard)';
-    }
-  });
-
   // Join Squad Button
   document.getElementById('btn-join-squad')?.addEventListener('click', async () => {
     const code = document.getElementById('input-join-code').value.trim();
@@ -783,7 +788,7 @@ function setupEventListeners() {
     });
   });
 
-  // Start Duel Button (Non-blocking)
+  // Start Duel Button
   document.getElementById('btn-start-duel')?.addEventListener('click', () => {
     const oppSelect = document.getElementById('duel-opponent-select');
     const oppUser = oppSelect.value;
@@ -825,28 +830,4 @@ function setupEventListeners() {
     document.querySelector('.duel-setup-form').style.display = 'flex';
     showToast('Match ended.');
   });
-}
-
-/**
- * Populate repository dropdown selector.
- */
-async function populateRepoDropdown(token, selectedRepo) {
-  try {
-    const gh = new GitHubAPI(token);
-    const repos = await gh.getUserRepos();
-    const select = document.getElementById('select-github-repo');
-    select.innerHTML = '<option value="leetcode-submissions">leetcode-submissions (Auto-created)</option>';
-
-    repos.forEach(r => {
-      const opt = document.createElement('option');
-      opt.value = r.name;
-      opt.innerText = r.name;
-      if (r.name === selectedRepo) {
-        opt.selected = true;
-      }
-      select.appendChild(opt);
-    });
-  } catch (err) {
-    console.warn('[Popup] Repo dropdown notice:', err.message);
-  }
 }

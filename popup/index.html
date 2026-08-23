@@ -7,7 +7,66 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app-container">
+  <!-- 1. ONBOARDING GATEWAY (First-time / Disconnected Users) -->
+  <div id="onboarding-container" class="onboarding-screen" style="display: none;">
+    <div class="onboard-brand-box">
+      <div class="brand-icon-box-lg">⚡</div>
+      <h1 class="onboard-brand-title">LeetSync <span class="brand-tag">SQUADS</span></h1>
+      <p class="onboard-brand-sub">Your intelligent DSA coding companion and squad competition layer.</p>
+    </div>
+
+    <div class="onboard-features-list">
+      <div class="onboard-feature-item">
+        <span class="feature-icon">🐙</span>
+        <div class="feature-text">
+          <div class="feature-head">Automatic GitHub Sync</div>
+          <div class="feature-desc">Every accepted LeetCode solution automatically backed up with clean READMEs.</div>
+        </div>
+      </div>
+
+      <div class="onboard-feature-item">
+        <span class="feature-icon">🔥</span>
+        <div class="feature-text">
+          <div class="feature-head">Streak & Roadmaps</div>
+          <div class="feature-desc">Track momentum and practice curated Blind 75 and NeetCode 150 problems.</div>
+        </div>
+      </div>
+
+      <div class="onboard-feature-item">
+        <span class="feature-icon">⚔️</span>
+        <div class="feature-text">
+          <div class="feature-head">Multiplayer Squad Duels</div>
+          <div class="feature-desc">Compete with squad mates in live 1v1 speed problem races.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="onboard-cta-section">
+      <button class="btn-cta-solve onboard-primary-btn" id="btn-onboard-connect-oauth">
+        <span>🐙</span>
+        <span>Connect with GitHub</span>
+      </button>
+
+      <div class="onboard-divider"><span>OR</span></div>
+
+      <!-- Quick Inline Token Entry for instant access -->
+      <div class="form-field-group" style="width: 100%;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <label class="field-label">Personal Access Token (PAT):</label>
+          <a href="https://github.com/settings/tokens/new?description=LeetSync+Squads&scopes=repo" target="_blank" style="font-size: 11px; color: var(--accent-blue); text-decoration: none;">Create Token ↗</a>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <input type="password" id="input-onboard-token" placeholder="ghp_xxxxxxxxxxxx" class="input-flat" style="flex: 1;">
+          <button class="btn-secondary-flat" id="btn-onboard-submit-token" style="padding: 6px 12px; font-weight: 600;">Link →</button>
+        </div>
+      </div>
+
+      <div class="backfill-msg" id="onboard-status-msg" style="text-align: center; margin-top: 4px;"></div>
+    </div>
+  </div>
+
+  <!-- 2. MAIN APP CONTAINER (Unlocked after GitHub is connected) -->
+  <div id="app-container" style="display: none;">
     <!-- Header Brand Lockup -->
     <header class="app-header">
       <div class="brand">
@@ -139,7 +198,7 @@
             </div>
           </div>
 
-          <!-- Section 4: GitHub Sync -->
+          <!-- Section 4: Subordinate GitHub Sync -->
           <div class="github-footer-strip">
             <div class="github-header-row">
               <div class="github-ident">
@@ -149,21 +208,10 @@
               <span class="github-status-dot" id="github-sync-indicator">● Standby</span>
             </div>
 
-            <!-- Disconnected State -->
-            <div id="github-disconnected-box" style="display: none;">
-              <button class="btn-cta-solve" id="btn-quick-connect-github" style="width: 100%; justify-content: center; padding: 7px;">
-                <span>🐙</span>
-                <span>Connect GitHub in Settings →</span>
-              </button>
-            </div>
-
-            <!-- Connected State -->
-            <div id="github-connected-box">
-              <button class="btn-sync-action" id="btn-backfill-all">
-                <span>⚡</span>
-                <span>Sync Solutions to Repository</span>
-              </button>
-            </div>
+            <button class="btn-sync-action" id="btn-backfill-all">
+              <span>⚡</span>
+              <span>Sync Solutions to Repository</span>
+            </button>
 
             <div class="backfill-progress-area" id="backfill-progress-box" style="display: none;">
               <div class="backfill-msg" id="backfill-status-msg">Backfilling solutions...</div>
@@ -334,45 +382,25 @@
           </div>
         </div>
 
-        <!-- GITHUB BACKUP INTEGRATION: NON-BLOCKING INLINE SETUP -->
+        <!-- GITHUB BACKUP INTEGRATION -->
         <div class="settings-group-card">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <span class="section-label">GITHUB BACKUP SYNC</span>
-            <span id="settings-conn-badge" style="font-size: 11px; font-weight: 600; color: var(--text-muted);">● Not Connected</span>
+            <span id="settings-conn-badge" style="font-size: 11px; font-weight: 600; color: var(--color-easy);">● Connected</span>
           </div>
 
           <div class="form-field-group">
-            <div style="display: flex; align-items: baseline; justify-content: space-between;">
-              <label class="field-label">GitHub Personal Access Token:</label>
-              <a href="https://github.com/settings/tokens/new?description=LeetSync+Squads&scopes=repo" target="_blank" style="font-size: 11px; color: var(--accent-blue); text-decoration: none;">Get Token ↗</a>
-            </div>
-            <input type="password" id="input-github-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" class="input-flat">
+            <label class="field-label">Active Connected Repository:</label>
+            <input type="text" id="input-active-repo" readonly value="leetcode-submissions" class="input-flat" style="background: var(--bg-muted);">
           </div>
 
           <div style="display: flex; gap: 8px; margin-top: 2px;">
-            <button class="btn-cta-solve" id="btn-save-settings" style="flex: 1; justify-content: center; padding: 7px;">
+            <button class="btn-cta-solve" id="btn-settings-sync-now" style="flex: 1; justify-content: center; padding: 7px;">
               <span>⚡</span>
-              <span>Link Account & Auto-Create Repo</span>
+              <span>Sync All Solutions Now</span>
             </button>
-            <button class="btn-secondary-flat" id="btn-disconnect-github" style="display: none; color: var(--color-hard); font-size: 11px;">Disconnect</button>
+            <button class="btn-secondary-flat" id="btn-disconnect-github" style="color: var(--color-hard); font-size: 11px;">Disconnect</button>
           </div>
-
-          <!-- Advanced Repository Options -->
-          <details style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
-            <summary style="cursor: pointer; font-weight: 600;">Custom repository settings</summary>
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
-              <div class="form-field-group">
-                <label class="field-label">Target Repository:</label>
-                <select id="select-github-repo" class="select-flat">
-                  <option value="leetcode-submissions">leetcode-submissions (Auto-created)</option>
-                </select>
-              </div>
-              <div class="form-field-group">
-                <label class="field-label">Target Branch:</label>
-                <input type="text" id="input-github-branch" value="main" class="input-flat">
-              </div>
-            </div>
-          </details>
 
           <div class="backfill-msg" id="auth-status-msg" style="text-align: center; margin-top: 2px;"></div>
         </div>
