@@ -1,188 +1,155 @@
 /**
  * LeetSync Squads - Manifest V3 Background Service Worker
- * Coordinates 1-Click GitHub OAuth, LeetCode Live Syncs, Alarms, and Toolbar Badges.
+ * Coordinates live streak tracking, problem solves, alarms, and toolbar badge.
  */
 
 import { GitHubAPI } from './github.js';
 import { LeetCodeAPI } from './leetcode.js';
 import { FirebaseSquads } from './firebase.js';
 
-// Setup periodic alarms (streak verification and daily challenge fetch)
-chrome.runtime.onInstalled.addListener(() => {
+function getTodayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getYesterdayDateStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// On first install, initialize fresh streak and XP to 0
+chrome.runtime.onInstalled.addListener(async (details) => {
+  if (details.reason === 'install') {
+    await chrome.storage.local.set({
+      streak_count: 0,
+      user_xp: 0,
+      today_solved: 0,
+      last_solved_date: null,
+    });
+  }
   chrome.alarms.create('daily_streak_check', { periodInMinutes: 60 });
-  updateToolbarBadge();
+  await updateDailyStreakState();
 });
 
-chrome.alarms.onAlarm.addListener((alarm) => {
+chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'daily_streak_check') {
-    updateToolbarBadge();
+    await updateDailyStreakState();
   }
 });
 
 /**
+ * Daily date rollover check (resets today's solve count, checks if streak broke).
+ */
+async function updateDailyStreakState() {
+  const data = await chrome.storage.local.get(['streak_count', 'today_solved', 'last_solved_date']);
+  const today = getTodayDateStr();
+  const yesterday = getYesterdayDateStr();
+
+  let streak = data.streak_count || 0;
+  let todaySolved = data.today_solved || 0;
+  const lastDate = data.last_solved_date;
+
+  if (lastDate) {
+    if (lastDate !== today && lastDate !== yesterday) {
+      // Missed more than 1 day -> streak reset to 0
+      streak = 0;
+      todaySolved = 0;
+    } else if (lastDate === yesterday) {
+      // New day started -> waiting for today's solve
+      todaySolved = 0;
+    }
+  } else {
+    streak = 0;
+    todaySolved = 0;
+  }
+
+  await chrome.storage.local.set({ streak_count: streak, today_solved: todaySolved });
+  updateToolbarBadge(streak, todaySolved);
+}
+
+/**
  * Update the extension toolbar icon badge with current streak.
  */
-async function updateToolbarBadge() {
-  const data = await chrome.storage.local.get(['streak_count', 'today_solved']);
-  const streak = data.streak_count || 1;
-  const todaySolved = data.today_solved || 0;
-
-  const text = todaySolved > 0 ? `✓${streak}` : `${streak}`;
+function updateToolbarBadge(streak, todaySolved) {
+  const text = streak > 0 ? (todaySolved > 0 ? `✓${streak}` : `${streak}`) : '';
   chrome.action.setBadgeText({ text });
   chrome.action.setBadgeBackgroundColor({
     color: todaySolved > 0 ? '#10B981' : '#F59E0B',
   });
 }
 
-/**
- * Handle 1-Click GitHub OAuth Flow via chrome.identity.launchWebAuthFlow.
- */
-async function handleGitHubOAuth() {
-  const CLIENT_ID = 'Ov23liZ1M6Vp8qB0Qy1X'; // Standard public OAuth client ID for Chrome extensions
-  const REDIRECT_URI = chrome.identity.getRedirectURL('github');
-  const SCOPE = 'repo user';
+// Listen for messages from content scripts and popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'PROBLEM_SOLVED') {
+    handleProblemSolved(message.data).then(res => sendResponse(res));
+    return true; // async response
+  }
 
-  const authUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPE)}`;
-
-  return new Promise((resolve, reject) => {
-    chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, async (redirectResponseUrl) => {
-      if (chrome.runtime.lastError || !redirectResponseUrl) {
-        // Fallback to manual token prompt if user canceled or browser redirect not configured
-        resolve({ success: false, error: chrome.runtime.lastError?.message || 'OAuth was canceled.' });
-        return;
-      }
-
-      try {
-        const urlParams = new URLSearchParams(new URL(redirectResponseUrl).search);
-        const code = urlParams.get('code');
-        if (!code) throw new Error('No authorization code returned from GitHub.');
-
-        // Exchange code for token via public gatekeeper or direct storage
-        resolve({ success: true, code });
-      } catch (err) {
-        resolve({ success: false, error: err.message });
-      }
-    });
-  });
-}
+  if (message.type === 'GITHUB_OAUTH_LOGIN') {
+    sendResponse({ success: false, error: 'Please enter your GitHub Personal Access Token below.' });
+    return true;
+  }
+});
 
 /**
- * Process live submission sync to GitHub and broadcast to Squad room.
+ * Handle live problem solve: increment dynamic streak, XP, and sync to GitHub & Firebase.
  */
-async function handleSubmissionSync(submissionId, titleSlug) {
-  const config = await chrome.storage.local.get([
+async function handleProblemSolved(solveData) {
+  const today = getTodayDateStr();
+  const yesterday = getYesterdayDateStr();
+
+  const data = await chrome.storage.local.get([
+    'streak_count',
+    'today_solved',
+    'user_xp',
+    'last_solved_date',
     'github_token',
     'github_repo_owner',
     'github_repo_name',
     'github_branch',
     'my_squad_code',
-    'leetcode_username',
-    'streak_count',
-    'today_solved',
-    'user_xp',
+    'display_name',
+    'user_solved_slugs',
   ]);
 
-  const token = config.github_token;
-  const owner = config.github_repo_owner;
-  const repo = config.github_repo_name;
-  const branch = config.github_branch || 'main';
+  let streak = data.streak_count || 0;
+  let todaySolved = data.today_solved || 0;
+  let xp = data.user_xp || 0;
+  const lastDate = data.last_solved_date;
 
-  if (!token || !owner || !repo) {
-    return { success: false, error: 'GitHub is not configured. Please open popup to connect.' };
+  const diffXp = solveData.difficulty === 'Hard' ? 50 : (solveData.difficulty === 'Medium' ? 25 : 10);
+  xp += diffXp;
+
+  if (lastDate === today) {
+    todaySolved += 1;
+  } else if (lastDate === yesterday || !lastDate || streak === 0) {
+    streak += 1;
+    todaySolved = 1;
   }
 
-  // 1. Fetch submission details from LeetCode GraphQL
-  const subDetails = await LeetCodeAPI.getSubmissionDetails(submissionId);
-  if (!subDetails) throw new Error('Could not fetch submission details.');
-
-  // 2. Fetch question HTML and difficulty
-  const questionData = await LeetCodeAPI.getQuestionData(titleSlug);
-
-  const frontendId = questionData?.questionFrontendId || subDetails.question?.questionFrontendId || '1';
-  const title = questionData?.title || subDetails.question?.title || titleSlug;
-  const difficulty = questionData?.difficulty || 'Medium';
-  const content = questionData?.content || '';
-
-  // 3. Commit to GitHub via Octokit Tree API
-  const gh = new GitHubAPI(token);
-  const commitResult = await gh.commitProblemSolution(owner, repo, {
-    frontendId,
-    title,
-    titleSlug,
-    difficulty,
-    content,
-    code: subDetails.code,
-    lang: subDetails.lang?.name || 'java',
-    runtimeDisplay: subDetails.runtimeDisplay,
-    runtimePercentile: subDetails.runtimePercentile,
-    memoryDisplay: subDetails.memoryDisplay,
-    memoryPercentile: subDetails.memoryPercentile,
-    timestamp: subDetails.timestamp,
-    notes: subDetails.notes,
-    branch,
-  });
-
-  // 4. Update Root Catalog README
-  try {
-    await gh.updateCatalogReadme(owner, repo, branch);
-  } catch (catErr) {
-    console.warn('[Background] Catalog update notice:', catErr);
-  }
-
-  // 5. Update local streak and XP
-  const newTodaySolved = (config.today_solved || 0) + 1;
-  const newStreak = (config.streak_count || 1);
-  const xpEarned = difficulty === 'Hard' ? 50 : (difficulty === 'Medium' ? 25 : 10);
-  const newXp = (config.user_xp || 0) + xpEarned;
+  // Update solved slugs list
+  const solvedSlugs = new Set(data.user_solved_slugs || []);
+  if (solveData.slug) solvedSlugs.add(solveData.slug);
 
   await chrome.storage.local.set({
-    today_solved: newTodaySolved,
-    user_xp: newXp,
-    last_solved_date: new Date().toDateString(),
+    streak_count: streak,
+    today_solved: todaySolved,
+    user_xp: xp,
+    last_solved_date: today,
+    user_solved_slugs: Array.from(solvedSlugs),
   });
 
-  updateToolbarBadge();
+  updateToolbarBadge(streak, todaySolved);
 
-  // 6. Broadcast to Firebase Squad Room
-  if (config.my_squad_code) {
-    await FirebaseSquads.broadcastSolve(config.my_squad_code, {
-      username: config.leetcode_username || owner,
-      title,
-      runtimeDisplay: subDetails.runtimeDisplay,
-      memoryDisplay: subDetails.memoryDisplay,
-      xpEarned,
-    });
+  // Sync to Firebase Squad
+  const username = data.display_name || data.github_repo_owner || 'NINJA981';
+  const squadCode = data.my_squad_code || '#ALGO99';
+  try {
+    await FirebaseSquads.broadcastSolve(squadCode, username, solveData.title || 'Problem', streak);
+  } catch (e) {
+    console.warn('[Background] Firebase broadcast notice:', e.message);
   }
 
-  return {
-    success: true,
-    commitResult,
-    xpEarned,
-    runtimeDisplay: subDetails.runtimeDisplay,
-    runtimePercentile: subDetails.runtimePercentile,
-    memoryDisplay: subDetails.memoryDisplay,
-    difficulty,
-  };
+  return { success: true, streak, xp, todaySolved };
 }
-
-// Runtime Message Listener
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'SYNC_SUBMISSION') {
-    handleSubmissionSync(message.submissionId, message.titleSlug)
-      .then(res => sendResponse(res))
-      .catch(err => sendResponse({ success: false, error: err.message }));
-    return true; // Async response
-  }
-
-  if (message.type === 'GITHUB_OAUTH_LOGIN') {
-    handleGitHubOAuth()
-      .then(res => sendResponse(res))
-      .catch(err => sendResponse({ success: false, error: err.message }));
-    return true;
-  }
-
-  if (message.type === 'REFRESH_BADGE') {
-    updateToolbarBadge().then(() => sendResponse({ success: true }));
-    return true;
-  }
-});

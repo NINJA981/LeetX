@@ -1,6 +1,6 @@
 /**
  * LeetSync Squads - Popup Application Logic & View Router
- * Production-ready: Custom Display Name, Dynamic Roadmaps, and Real Live Peer Duels.
+ * Production-ready: Authentic 0-default Streak & XP, Dynamic Leveling, and Clean Peer Duels.
  */
 
 import { LeetCodeAPI } from '../scripts/leetcode.js';
@@ -12,11 +12,22 @@ let currentRoadmapType = 'blind75';
 let userSolvedSlugs = new Set();
 let currentUsername = 'NINJA981';
 
+function getTodayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getYesterdayDateStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', async () => {
   setupTabs();
   await loadStoredState();
-  await syncLiveLeetCodeProfile();
+  await syncLiveLeetCodeSession();
   await loadDailyChallenge();
   await loadRoadmap(currentRoadmapType);
   setupEventListeners();
@@ -56,14 +67,14 @@ async function loadStoredState() {
     'streak_count',
     'today_solved',
     'user_xp',
+    'last_solved_date',
     'my_squad_code',
-    'leetcode_username',
     'user_solved_slugs',
     'duel_wins',
     'duel_played',
   ]);
 
-  // Priority: User's custom display name > GitHub username > LeetCode user > Default NINJA981
+  // Priority: User's custom display name > GitHub username > Default NINJA981
   currentUsername = data.display_name || data.github_repo_owner || 'NINJA981';
   document.getElementById('input-display-name').value = currentUsername;
 
@@ -71,12 +82,31 @@ async function loadStoredState() {
     userSolvedSlugs = new Set(data.user_solved_slugs);
   }
 
-  // Header badges
-  document.getElementById('header-streak-count').innerText = data.streak_count || 0;
-  document.getElementById('header-xp-val').innerText = data.user_xp || 0;
+  // Daily Rollover Check
+  const today = getTodayDateStr();
+  const yesterday = getYesterdayDateStr();
+  let streak = data.streak_count || 0;
+  let todaySolved = data.today_solved || 0;
+  const lastDate = data.last_solved_date;
+
+  if (lastDate) {
+    if (lastDate !== today && lastDate !== yesterday) {
+      streak = 0;
+      todaySolved = 0;
+      await chrome.storage.local.set({ streak_count: 0, today_solved: 0 });
+    } else if (lastDate === yesterday) {
+      todaySolved = 0;
+      await chrome.storage.local.set({ today_solved: 0 });
+    }
+  }
+
+  const xp = data.user_xp || 0;
+
+  // Header badges (defaults strictly to real 0 on fresh install)
+  document.getElementById('header-streak-count').innerText = streak;
+  document.getElementById('header-xp-val').innerText = xp;
 
   // Today goal
-  const todaySolved = data.today_solved || 0;
   document.getElementById('today-solved-text').innerText = `${todaySolved} / 1 Solved`;
   const todayPct = Math.min(100, todaySolved * 100);
   document.getElementById('today-progress-bar').style.width = `${todayPct}%`;
@@ -115,7 +145,7 @@ async function loadStoredState() {
   // Squad State
   const squadCode = data.my_squad_code || '#ALGO99';
   document.getElementById('squad-room-code').innerText = squadCode;
-  await renderSquad(squadCode);
+  await renderSquad(squadCode, streak, todaySolved, xp);
 
   // Duel stats
   const wins = data.duel_wins || 0;
@@ -126,35 +156,16 @@ async function loadStoredState() {
 }
 
 /**
- * Fetch and sync real live LeetCode profile data directly from browser session.
+ * Validate live LeetCode session without overwriting streak/XP.
  */
-async function syncLiveLeetCodeProfile() {
+async function syncLiveLeetCodeSession() {
   try {
     const userStatus = await LeetCodeAPI.getCurrentUser();
-    if (userStatus && userStatus.isSignedIn && userStatus.username) {
-      const stats = await LeetCodeAPI.getUserStats(userStatus.username);
-      if (stats) {
-        // Daily consecutive streak from calendar
-        const streak = stats.streak || 0;
-        const totalSolved = stats.totalSolved || 0;
-        const xp = (stats.easySolved * 10) + (stats.mediumSolved * 25) + (stats.hardSolved * 50);
-
-        document.getElementById('header-streak-count').innerText = streak;
-        document.getElementById('header-xp-val').innerText = xp;
-
-        await chrome.storage.local.set({
-          streak_count: streak,
-          total_solved: totalSolved,
-          user_xp: xp,
-        });
-
-        // Re-render squad with real profile info
-        const squadCode = document.getElementById('squad-room-code').innerText;
-        await renderSquad(squadCode);
-      }
+    if (userStatus && userStatus.isSignedIn) {
+      console.log('[LeetSync] Logged into LeetCode session.');
     }
   } catch (err) {
-    console.warn('[Popup] LeetCode profile query notice:', err.message);
+    console.warn('[Popup] LeetCode session check:', err.message);
   }
 }
 
@@ -235,44 +246,38 @@ function renderRoadmapList(categoryFilter = 'all') {
 /**
  * Render Squad Leaderboard and Activity Stream with strict member cleanup.
  */
-async function renderSquad(squadCode) {
+async function renderSquad(squadCode, currentStreak = 0, currentTodaySolved = 0, currentXP = 0) {
   const stored = await chrome.storage.local.get([
     `squad_${squadCode}`,
     'display_name',
     'github_repo_owner',
-    'streak_count',
-    'today_solved',
-    'total_solved',
-    'user_xp',
   ]);
 
   const username = stored.display_name || stored.github_repo_owner || currentUsername || 'NINJA981';
   const rawSquad = await FirebaseSquads.joinOrCreateSquad(squadCode, {
     username,
-    streak: stored.streak_count || 0,
-    todaySolved: stored.today_solved || 0,
-    totalSolved: stored.total_solved || 0,
-    xp: stored.user_xp || 0,
+    streak: currentStreak,
+    todaySolved: currentTodaySolved,
+    totalSolved: currentTodaySolved,
+    xp: currentXP,
   });
 
-  // Strict deduplication & filter out random/ghost usernames (like AH0CQLRCsa or You)
+  // Strict deduplication & filter out ghost usernames
   const memberMap = new Map();
   (rawSquad.members || []).forEach(m => {
-    if (!m.username || m.username === 'undefined' || m.username === 'null') return;
-    if (m.username === 'You') return;
-    // Strip old auto-generated random string if real display name is active
+    if (!m.username || m.username === 'undefined' || m.username === 'null' || m.username === 'You') return;
     if (m.username.startsWith('AH0C') && username !== m.username) return;
 
     memberMap.set(m.username, m);
   });
 
-  // Always ensure current user is in squad with real username
+  // Ensure current user is present with authentic live streak & xp
   memberMap.set(username, {
     username,
-    streak: stored.streak_count || 0,
-    todaySolved: stored.today_solved || 0,
-    totalSolved: stored.total_solved || 0,
-    xp: stored.user_xp || 0,
+    streak: currentStreak,
+    todaySolved: currentTodaySolved,
+    totalSolved: currentTodaySolved,
+    xp: currentXP,
     lastActive: Date.now(),
     status: 'online',
   });
@@ -310,7 +315,7 @@ async function renderSquad(squadCode) {
       const targetUser = e.currentTarget.dataset.user;
       await FirebaseSquads.sendNudge(squadCode, username, targetUser, '👋');
       btn.innerText = '✨';
-      setTimeout(() => renderSquad(squadCode), 400);
+      setTimeout(() => renderSquad(squadCode, currentStreak, currentTodaySolved, currentXP), 400);
     });
   });
 
@@ -365,7 +370,29 @@ function setupEventListeners() {
     const newCode = FirebaseSquads.generateRoomCode();
     await chrome.storage.local.set({ my_squad_code: newCode });
     document.getElementById('squad-room-code').innerText = newCode;
-    await renderSquad(newCode);
+    const data = await chrome.storage.local.get(['streak_count', 'today_solved', 'user_xp']);
+    await renderSquad(newCode, data.streak_count || 0, data.today_solved || 0, data.user_xp || 0);
+  });
+
+  // Reset Streak & XP Button (Fresh Start)
+  document.getElementById('btn-reset-streak')?.addEventListener('click', async () => {
+    if (confirm('Reset your streak and XP to 0 for a fresh start?')) {
+      await chrome.storage.local.set({
+        streak_count: 0,
+        user_xp: 0,
+        today_solved: 0,
+        last_solved_date: null,
+      });
+      document.getElementById('header-streak-count').innerText = 0;
+      document.getElementById('header-xp-val').innerText = 0;
+      document.getElementById('today-solved-text').innerText = '0 / 1 Solved';
+      document.getElementById('today-progress-bar').style.width = '0%';
+      document.getElementById('today-status-pill').innerText = 'Pending ⏳';
+      document.getElementById('today-status-pill').className = 'status-pill';
+      const squadCode = document.getElementById('squad-room-code').innerText;
+      await renderSquad(squadCode, 0, 0, 0);
+      alert('Streak and XP reset to 0!');
+    }
   });
 
   // 1-Click Backfill Button
@@ -457,7 +484,8 @@ function setupEventListeners() {
     const code = document.getElementById('input-join-code').value.trim();
     if (code) {
       await chrome.storage.local.set({ my_squad_code: code.toUpperCase() });
-      await renderSquad(code.toUpperCase());
+      const data = await chrome.storage.local.get(['streak_count', 'today_solved', 'user_xp']);
+      await renderSquad(code.toUpperCase(), data.streak_count || 0, data.today_solved || 0, data.user_xp || 0);
       document.getElementById('squad-room-code').innerText = code.toUpperCase();
       document.getElementById('input-join-code').value = '';
     }
