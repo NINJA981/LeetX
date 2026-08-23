@@ -139,7 +139,7 @@
             </div>
           </div>
 
-          <!-- Section 4: 1-Click GitHub Sync -->
+          <!-- Section 4: GitHub Sync -->
           <div class="github-footer-strip">
             <div class="github-header-row">
               <div class="github-ident">
@@ -149,15 +149,15 @@
               <span class="github-status-dot" id="github-sync-indicator">● Standby</span>
             </div>
 
-            <!-- Disconnected State: 1-Click Connect -->
+            <!-- Disconnected State -->
             <div id="github-disconnected-box" style="display: none;">
               <button class="btn-cta-solve" id="btn-quick-connect-github" style="width: 100%; justify-content: center; padding: 7px;">
                 <span>🐙</span>
-                <span>Connect GitHub</span>
+                <span>Connect GitHub in Settings →</span>
               </button>
             </div>
 
-            <!-- Connected State: 1-Click Sync -->
+            <!-- Connected State -->
             <div id="github-connected-box">
               <button class="btn-sync-action" id="btn-backfill-all">
                 <span>⚡</span>
@@ -334,46 +334,47 @@
           </div>
         </div>
 
+        <!-- GITHUB BACKUP INTEGRATION: NON-BLOCKING INLINE SETUP -->
         <div class="settings-group-card">
-          <span class="section-label">GITHUB BACKUP INTEGRATION</span>
-          <p style="font-size: 12px; color: var(--text-secondary); margin-top: -4px;">
-            Link your GitHub account to automatically create and back up solutions to <code>leetcode-submissions</code>.
-          </p>
-
-          <!-- 1-Click Connection Action -->
-          <div id="settings-github-auth-action" style="display: flex; gap: 8px;">
-            <button class="btn-cta-solve" id="btn-oauth-github" style="flex: 1; justify-content: center; padding: 8px;">
-              <span>🐙</span>
-              <span id="btn-oauth-github-text">Connect with GitHub</span>
-            </button>
-            <button class="btn-secondary-flat" id="btn-disconnect-github" style="display: none; color: var(--color-hard);">Disconnect</button>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span class="section-label">GITHUB BACKUP SYNC</span>
+            <span id="settings-conn-badge" style="font-size: 11px; font-weight: 600; color: var(--text-muted);">● Not Connected</span>
           </div>
 
-          <!-- Advanced PAT Toggle (Progressive Disclosure) -->
-          <details style="margin-top: 6px; font-size: 11px; color: var(--text-muted);">
-            <summary style="cursor: pointer; font-weight: 600;">Advanced authentication (Personal Access Token)</summary>
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
-              <div class="form-field-group">
-                <label class="field-label">Personal Access Token (PAT):</label>
-                <input type="password" id="input-github-token" placeholder="ghp_xxxxxxxxxxxx" class="input-flat">
-              </div>
+          <div class="form-field-group">
+            <div style="display: flex; align-items: baseline; justify-content: space-between;">
+              <label class="field-label">GitHub Personal Access Token:</label>
+              <a href="https://github.com/settings/tokens/new?description=LeetSync+Squads&scopes=repo" target="_blank" style="font-size: 11px; color: var(--accent-blue); text-decoration: none;">Get Token ↗</a>
+            </div>
+            <input type="password" id="input-github-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" class="input-flat">
+          </div>
 
+          <div style="display: flex; gap: 8px; margin-top: 2px;">
+            <button class="btn-cta-solve" id="btn-save-settings" style="flex: 1; justify-content: center; padding: 7px;">
+              <span>⚡</span>
+              <span>Link Account & Auto-Create Repo</span>
+            </button>
+            <button class="btn-secondary-flat" id="btn-disconnect-github" style="display: none; color: var(--color-hard); font-size: 11px;">Disconnect</button>
+          </div>
+
+          <!-- Advanced Repository Options -->
+          <details style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
+            <summary style="cursor: pointer; font-weight: 600;">Custom repository settings</summary>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
               <div class="form-field-group">
                 <label class="field-label">Target Repository:</label>
                 <select id="select-github-repo" class="select-flat">
-                  <option value="">Select a repository...</option>
+                  <option value="leetcode-submissions">leetcode-submissions (Auto-created)</option>
                 </select>
               </div>
-
               <div class="form-field-group">
                 <label class="field-label">Target Branch:</label>
                 <input type="text" id="input-github-branch" value="main" class="input-flat">
               </div>
-              <button class="btn-secondary-flat" id="btn-save-settings" style="justify-content: center; padding: 6px;">Save Manual Settings</button>
             </div>
           </details>
 
-          <div class="backfill-msg" id="auth-status-msg" style="text-align: center;"></div>
+          <div class="backfill-msg" id="auth-status-msg" style="text-align: center; margin-top: 2px;"></div>
         </div>
 
         <div class="settings-group-card">
