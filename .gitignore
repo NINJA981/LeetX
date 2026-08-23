@@ -1,0 +1,14 @@
+# Dependencies & System Files
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# Scratch temporary testing scripts (keep repo clean)
+scratch/clean_firestore.js
+
+# Keep only release packages in dist/
+dist/leetsync-squads-v1.0.*.zip
+dist/leetsync-squads-v1.1.0.zip
+dist/leetsync-squads-v1.1.1.zip

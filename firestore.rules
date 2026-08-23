@@ -1,8 +1,21 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Squad rooms — public read/write scoped to squad documents
+    match /squads/{roomCode} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasAny(['members', 'activityFeed', 'challenge', 'lastActive', 'code', 'createdAt', 'owner', 'leader']);
+    }
+
+    // 1v1 Duel matches — public read/write scoped to duel documents
+    match /duels/{duelId} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasAny(['id', 'roomCode', 'challenger', 'opponent', 'status', 'problem', 'format', 'winner', 'loser', 'startedAt', 'finishedAt', 'createdAt', 'revealed', 'runtime']);
+    }
+
+    // Deny all other collections
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

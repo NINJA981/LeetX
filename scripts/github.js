@@ -3,6 +3,8 @@
  * Enables 1-Click browser authentication, automatic repo creation, and atomic Git Tree commits.
  */
 
+import { LeetCodeAPI } from './leetcode.js';
+
 // GitHub CLI / VSCode Public OAuth App Client ID (supports standard device flow with repo scope)
 const GITHUB_PUBLIC_CLIENT_ID = '178c6fc778ccc68e1d6a'; 
 
@@ -181,7 +183,7 @@ export class GitHubAPI {
           method: 'POST',
           body: JSON.stringify({
             name: repoName,
-            description: 'LeetCode Data Structures and Algorithms solutions automatically synced with LeetSync Squads ⚡',
+            description: 'LeetCode Data Structures and Algorithms solutions automatically synced with LeetX Squads ⚡',
             private: false,
             auto_init: true,
           }),
@@ -227,7 +229,7 @@ export class GitHubAPI {
     const runtimePctStr = runtimePercentile != null ? ` (${parseFloat(runtimePercentile).toFixed(2)}%)` : '';
     const memoryPctStr = memoryPercentile != null ? ` (${parseFloat(memoryPercentile).toFixed(2)}%)` : '';
 
-    return `Time: ${runtimePart}${runtimePctStr} | Memory: ${memoryPart}${memoryPctStr} - LeetSync`;
+    return `Time: ${runtimePart}${runtimePctStr} | Memory: ${memoryPart}${memoryPctStr} - LeetX Squads`;
   }
 
   /**
@@ -249,91 +251,104 @@ export class GitHubAPI {
     notes,
     branch = 'main',
   }) {
-    const folderName = `${frontendId}-${titleSlug}`;
+    const diffFolder = difficulty ? (difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase()) : 'Medium';
+    const paddedId = String(frontendId).padStart(4, '0');
+    const folderName = `${diffFolder}/${paddedId}-${titleSlug}`;
     const ext = getFileExtension(lang);
     const solutionFileName = `${titleSlug}${ext}`;
 
     const readmeContent = GitHubAPI.buildProblemReadme(title, titleSlug, difficulty, content);
     const commitMessage = GitHubAPI.formatCommitMessage(runtimeDisplay, runtimePercentile, memoryDisplay, memoryPercentile);
 
-    // 1. Get latest commit SHA on branch
-    const refData = await this.request(`/repos/${owner}/${repo}/git/ref/heads/${branch}`);
-    const latestCommitSha = refData.object.sha;
+    let attempts = 0;
+    const maxAttempts = 3;
 
-    // 2. Get base tree SHA
-    const commitData = await this.request(`/repos/${owner}/${repo}/git/commits/${latestCommitSha}`);
-    const baseTreeSha = commitData.tree.sha;
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        // 1. Get latest commit SHA on branch
+        const refData = await this.request(`/repos/${owner}/${repo}/git/ref/heads/${branch}?_cb=${Date.now()}`);
+        const latestCommitSha = refData.object.sha;
 
-    // 3. Prepare tree items
-    const treeItems = [
-      {
-        path: `${folderName}/README.md`,
-        mode: '100644',
-        type: 'blob',
-        content: readmeContent,
-      },
-      {
-        path: `${folderName}/${solutionFileName}`,
-        mode: '100644',
-        type: 'blob',
-        content: code,
-      },
-    ];
+        // 2. Get base tree SHA
+        const commitData = await this.request(`/repos/${owner}/${repo}/git/commits/${latestCommitSha}?_cb=${Date.now()}`);
+        const baseTreeSha = commitData.tree.sha;
 
-    if (notes && notes.trim()) {
-      treeItems.push({
-        path: `${folderName}/Notes.md`,
-        mode: '100644',
-        type: 'blob',
-        content: notes.trim() + '\n',
-      });
+        // 3. Prepare tree items
+        const treeItems = [
+          {
+            path: `${folderName}/README.md`,
+            mode: '100644',
+            type: 'blob',
+            content: readmeContent,
+          },
+          {
+            path: `${folderName}/${solutionFileName}`,
+            mode: '100644',
+            type: 'blob',
+            content: code,
+          },
+        ];
+
+        if (notes && notes.trim()) {
+          treeItems.push({
+            path: `${folderName}/Notes.md`,
+            mode: '100644',
+            type: 'blob',
+            content: notes.trim() + '\n',
+          });
+        }
+
+        // 4. Create new Tree
+        const newTree = await this.request(`/repos/${owner}/${repo}/git/trees`, {
+          method: 'POST',
+          body: JSON.stringify({
+            base_tree: baseTreeSha,
+            tree: treeItems,
+          }),
+        });
+
+        // 5. Create Commit with authentic author & committer date
+        const commitPayload = {
+          message: commitMessage,
+          tree: newTree.sha,
+          parents: [latestCommitSha],
+        };
+
+        if (timestamp) {
+          const dateIso = new Date(timestamp * 1000).toISOString();
+          commitPayload.author = {
+            name: commitData.author?.name || owner,
+            email: commitData.author?.email || `${owner}@users.noreply.github.com`,
+            date: dateIso,
+          };
+          commitPayload.committer = commitPayload.author;
+        }
+
+        const createdCommit = await this.request(`/repos/${owner}/${repo}/git/commits`, {
+          method: 'POST',
+          body: JSON.stringify(commitPayload),
+        });
+
+        // 6. Update Branch Reference with force: true to prevent non-fast-forward errors during batch syncs
+        await this.request(`/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            sha: createdCommit.sha,
+            force: true,
+          }),
+        });
+
+        return {
+          commitSha: createdCommit.sha,
+          folderName,
+          commitMessage,
+        };
+      } catch (err) {
+        if (attempts >= maxAttempts) throw err;
+        await new Promise(r => setTimeout(r, 400 * attempts));
+      }
     }
-
-    // 4. Create new Tree
-    const newTree = await this.request(`/repos/${owner}/${repo}/git/trees`, {
-      method: 'POST',
-      body: JSON.stringify({
-        base_tree: baseTreeSha,
-        tree: treeItems,
-      }),
-    });
-
-    // 5. Create Commit with authentic author & committer date
-    const commitPayload = {
-      message: commitMessage,
-      tree: newTree.sha,
-      parents: [latestCommitSha],
-    };
-
-    if (timestamp) {
-      const dateIso = new Date(timestamp * 1000).toISOString();
-      commitPayload.author = {
-        name: commitData.author?.name || owner,
-        email: commitData.author?.email || `${owner}@users.noreply.github.com`,
-        date: dateIso,
-      };
-      commitPayload.committer = commitPayload.author;
-    }
-
-    const createdCommit = await this.request(`/repos/${owner}/${repo}/git/commits`, {
-      method: 'POST',
-      body: JSON.stringify(commitPayload),
-    });
-
-    // 6. Update Branch Reference
-    await this.request(`/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        sha: createdCommit.sha,
-        force: false,
-      }),
-    });
-
-    return {
-      commitSha: createdCommit.sha,
-      folderName,
-      commitMessage,
-    };
   }
 
   /**
@@ -345,27 +360,34 @@ export class GitHubAPI {
     const treeData = await this.request(`/repos/${owner}/${repo}/git/trees/${latestCommitSha}?recursive=1`);
 
     const problemMap = new Map();
-    const folderPattern = /^(\d+)-([a-z0-9-]+)\/(README\.md|([a-z0-9-]+)\.(py|java|js|cpp|ts|go|rs|sql|cs|kt|swift|rb|php|scala))$/i;
+    const folderPattern = /^(?:(Easy|Medium|Hard)\/)?(\d+)-([a-z0-9-]+)\/(README\.md|Notes\.md|([a-z0-9-]+)\.(py|java|js|cpp|ts|go|rs|sql|cs|kt|swift|rb|php|scala))$/i;
 
     for (const item of (treeData.tree || [])) {
       const match = item.path.match(folderPattern);
       if (match) {
-        const frontendId = parseInt(match[1], 10);
-        const titleSlug = match[2];
-        const fileName = match[3];
+        const diffFromFolder = match[1] ? (match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase()) : null;
+        const frontendId = parseInt(match[2], 10);
+        const titleSlug = match[3];
+        const fileName = match[4];
+        const folderName = match[1] ? `${match[1]}/${match[2]}-${titleSlug}` : `${match[2]}-${titleSlug}`;
 
         if (!problemMap.has(titleSlug)) {
           problemMap.set(titleSlug, {
             id: frontendId,
             titleSlug,
-            folderName: `${frontendId}-${titleSlug}`,
+            folderName,
             title: titleSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-            difficulty: 'Medium',
+            difficulty: diffFromFolder,
+            readmeSha: null,
             solutions: [],
           });
         }
 
         const prob = problemMap.get(titleSlug);
+        if (fileName === 'README.md') {
+          prob.readmeSha = item.sha;
+        }
+
         if (fileName !== 'README.md' && fileName !== 'Notes.md') {
           const ext = fileName.split('.').pop().toLowerCase();
           const langLabel = {
@@ -389,6 +411,36 @@ export class GitHubAPI {
       }
     }
 
+    // Resolve accurate difficulty for any legacy problem folders without Difficulty/ prefix
+    for (const prob of problemMap.values()) {
+      if (!prob.difficulty) {
+        if (prob.readmeSha) {
+          try {
+            const blobData = await this.request(`/repos/${owner}/${repo}/git/blobs/${prob.readmeSha}`);
+            if (blobData && blobData.content) {
+              const decoded = atob(blobData.content.replace(/\s/g, ''));
+              const badgeMatch = decoded.match(/Difficulty-(Easy|Medium|Hard)/i) || decoded.match(/Difficulty:\s*(Easy|Medium|Hard)/i);
+              if (badgeMatch && badgeMatch[1]) {
+                prob.difficulty = badgeMatch[1].charAt(0).toUpperCase() + badgeMatch[1].slice(1).toLowerCase();
+              }
+            }
+          } catch (e) {}
+        }
+
+        // Fallback: Query LeetCode GraphQL
+        if (!prob.difficulty) {
+          try {
+            const q = await LeetCodeAPI.getQuestionDetails(prob.titleSlug);
+            if (q && q.difficulty) {
+              prob.difficulty = q.difficulty;
+            }
+          } catch (e) {}
+        }
+
+        if (!prob.difficulty) prob.difficulty = 'Medium';
+      }
+    }
+
     const sortedProblems = Array.from(problemMap.values()).sort((a, b) => a.id - b.id);
     const totalCount = sortedProblems.length;
 
@@ -408,11 +460,11 @@ export class GitHubAPI {
       catalogContent += `| ${prob.id} | [${prob.title}](${prob.folderName}/) | \`${prob.difficulty}\` | ${solsStr} |\n`;
     }
 
-    catalogContent += `\n---\n\n<div align="center"><sub>Synced automatically with <a href="https://github.com/NINJA981/leetcode-submissions">LeetSync Squads</a></sub></div>\n`;
+    catalogContent += `\n---\n\n<div align="center"><sub>Synced automatically with <a href="https://github.com/${owner}/${repo}">LeetX Squads</a></sub></div>\n`;
 
     const currentReadme = await this.getFile(owner, repo, 'README.md', branch);
     const putPayload = {
-      message: 'Update problem catalog in README.md - LeetSync Squads',
+      message: 'Update problem catalog in README.md - LeetX Squads',
       content: btoa(unescape(encodeURIComponent(catalogContent))),
       branch,
     };
@@ -427,4 +479,36 @@ export class GitHubAPI {
 
     return totalCount;
   }
+
+  /**
+   * Scan repository tree to identify which problem slugs already have committed solutions.
+   */
+  async getExistingProblemSlugs(owner, repo, branch = 'main') {
+    try {
+      const refData = await this.request(`/repos/${owner}/${repo}/git/ref/heads/${branch}`);
+      const latestCommitSha = refData.object.sha;
+      const treeData = await this.request(`/repos/${owner}/${repo}/git/trees/${latestCommitSha}?recursive=1`);
+      const existing = new Set();
+
+      for (const item of (treeData.tree || [])) {
+        // 1. Match folder names like "1-two-sum", "0125-valid-palindrome", or "Easy/1-two-sum"
+        const folderMatch = item.path.match(/(?:^|\/)(\d+)-([a-z0-9-]+)(?:\/|$)/i);
+        if (folderMatch && folderMatch[2]) {
+          existing.add(folderMatch[2].toLowerCase().trim());
+        }
+
+        // 2. Match solution file names like "two-sum.py", "1-two-sum/two-sum.js"
+        const fileMatch = item.path.match(/(?:^|\/)([a-z0-9-]+)\.(?:py|java|js|cpp|ts|go|rs|sql|cs|kt|swift|rb|php|scala)$/i);
+        if (fileMatch && fileMatch[1] && fileMatch[1].toLowerCase() !== 'solution') {
+          existing.add(fileMatch[1].toLowerCase().trim());
+        }
+      }
+
+      return existing;
+    } catch (err) {
+      console.warn('[GitHubAPI] getExistingProblemSlugs notice:', err.message);
+      return new Set();
+    }
+  }
 }
+

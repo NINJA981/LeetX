@@ -1,16 +1,30 @@
 {
   "manifest_version": 3,
-  "name": "LeetSync Squads \u2014 Live GitHub Sync & Peer Streaks",
-  "version": "1.0.0",
-  "description": "Instant GitHub sync with authentic metrics, streak gamification, roadmaps, and real-time multiplayer Squad Rooms for LeetCode.",
+  "name": "LeetX Squads — Live GitHub Sync & Multiplayer DSA",
+  "version": "1.1.2",
+  "description": "Instant GitHub sync with authentic metrics, streak gamification, roadmaps, and real-time multiplayer Squad Rooms & 1v1 Duels for LeetCode.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "leetx-squads@ninja981.github.io",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
   "permissions": [
     "storage",
     "alarms",
     "identity",
-    "notifications"
+    "notifications",
+    "cookies",
+    "tabs"
   ],
   "host_permissions": [
     "https://leetcode.com/*",
+    "https://*.leetcode.com/*",
     "https://api.github.com/*",
     "https://firestore.googleapis.com/*",
     "https://*.firebaseio.com/*"
@@ -21,7 +35,7 @@
   },
   "action": {
     "default_popup": "popup/index.html",
-    "default_title": "LeetSync Squads",
+    "default_title": "LeetX Squads",
     "default_icon": {
       "16": "assets/icons/icon16.png",
       "48": "assets/icons/icon48.png",

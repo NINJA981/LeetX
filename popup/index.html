@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LeetSync Squads</title>
+  <title>LeetX Squads</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
   <div id="onboarding-container" class="onboarding-screen" style="display: none;">
     <div class="onboard-brand-box">
       <div class="brand-icon-box-lg">⚡</div>
-      <h1 class="onboard-brand-title">LeetSync <span class="brand-tag">SQUADS</span></h1>
+      <h1 class="onboard-brand-title">LeetX <span class="brand-tag">SQUADS</span></h1>
       <p class="onboard-brand-sub">Connect your GitHub to unlock roadmaps, live streaks, and automatic solution sync.</p>
     </div>
 
@@ -42,7 +42,7 @@
         <div class="step-num-badge">3</div>
         <div class="step-content">
           <div class="step-title">Paste & Unlock</div>
-          <div class="step-detail">Paste it below and click <b>Unlock</b>. LeetSync will auto-create your solutions repository!</div>
+          <div class="step-detail">Paste it below and click <b>Unlock</b>. LeetX will auto-create your solutions repository!</div>
         </div>
       </div>
     </div>
@@ -74,7 +74,7 @@
       <div class="brand">
         <div class="brand-icon-box">⚡</div>
         <div class="brand-title-wrap">
-          <span class="brand-name">LeetSync</span>
+          <span class="brand-name">LeetX</span>
           <span class="brand-tag">SQUADS</span>
         </div>
       </div>
@@ -227,65 +227,123 @@
 
       <!-- 2. SQUAD VIEW -->
       <section id="view-squad" class="tab-view">
-        <div class="squad-control-row">
-          <div style="display: flex; align-items: center; gap: 7px;">
-            <span class="section-label">ROOM</span>
-            <span class="squad-code-badge" id="squad-room-code">#ALGO99</span>
+        <!-- 1. Squad Room & Presence Header -->
+        <div class="squad-room-panel">
+          <div class="squad-room-top-row">
+            <div class="squad-identity-group">
+              <span class="squad-panel-label">SQUAD ROOM</span>
+              <div class="squad-code-display">
+                <span class="squad-code-value" id="squad-room-code">—</span>
+                <button class="squad-icon-btn" id="btn-copy-squad" title="Copy room code" aria-label="Copy room code">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span class="copy-btn-label" id="copy-feedback-text">Copy</span>
+                </button>
+                <button class="squad-icon-btn" id="btn-sync-squad" title="Refresh room" aria-label="Refresh room">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="squad-room-actions-right">
+              <button class="squad-btn-secondary" id="btn-create-room" title="Generate unique 6-character room code">
+                + New
+              </button>
+              <button class="squad-btn-leave" id="btn-leave-squad" title="Leave this squad room">
+                🚪 Leave
+              </button>
+            </div>
           </div>
-          <div class="squad-join-controls">
-            <input type="text" id="input-join-code" placeholder="Join #CODE" class="input-flat" style="width: 85px;">
-            <button class="btn-secondary-flat" id="btn-join-squad">Join</button>
-            <button class="btn-icon-btn" id="btn-copy-squad" title="Copy room code">📋</button>
-            <button class="btn-icon-btn" id="btn-sync-squad" title="Sync live room">🔄</button>
+
+          <!-- Actions: Code-based Join only (No manual handle addition) -->
+          <div class="squad-actions-stack">
+            <div class="squad-input-combo">
+              <input type="text" id="input-join-code" placeholder="Enter squad #CODE to join..." class="squad-input-field" maxlength="10">
+              <button class="squad-btn-primary" id="btn-join-squad">Join Squad</button>
+            </div>
+            <div class="squad-invite-helper">
+              <span>💡 Share your <strong>Squad Code</strong> above with teammates so they can join!</span>
+            </div>
           </div>
         </div>
 
-        <!-- Add Friend Directly to Squad -->
-        <div style="display: flex; gap: 6px; margin-bottom: 2px;">
-          <input type="text" id="input-add-member" placeholder="+ Add friend @username..." class="input-flat" style="flex: 1; font-size: 11px;">
-          <button class="btn-secondary-flat" id="btn-add-member" style="font-size: 11px; padding: 4px 10px; font-weight: 600;">+ Add</button>
+        <!-- 2. Squad Challenge Module -->
+        <div class="squad-challenge-module" id="squad-challenge-card">
+          <div class="challenge-module-header">
+            <div class="challenge-label-group">
+              <div class="challenge-kicker-row">
+                <span class="challenge-kicker">SQUAD CHALLENGE</span>
+                <span class="challenge-reward-badge" id="squad-challenge-reward">⭐ +150 XP</span>
+              </div>
+              <span class="challenge-title" id="squad-challenge-title">Solve 5 Tree / BST problems</span>
+              <div class="challenge-action-subrow">
+                <span class="challenge-category-tag" id="squad-challenge-cat">🌳 Trees</span>
+                <button class="challenge-quick-btn" id="btn-challenge-solve-quick">🎯 Find Matching Problems →</button>
+              </div>
+            </div>
+            <div class="challenge-right-actions">
+              <span class="challenge-score-badge" id="squad-challenge-target">0 / 5</span>
+              <button class="btn-reroll-challenge" id="btn-reroll-challenge" title="Reroll challenge from catalog">🎲 Reroll</button>
+            </div>
+          </div>
+          <div class="challenge-progress-track">
+            <div class="challenge-progress-fill" id="squad-challenge-bar" style="width: 0%;"></div>
+          </div>
+          <div class="challenge-footer-meta">
+            <span class="challenge-pct-text" id="challenge-pct-text">0% Complete</span>
+            <span class="challenge-sub-note" id="challenge-cycle-note">Cycles automatically on finish ⚡</span>
+          </div>
         </div>
 
-        <!-- Weekly Squad Challenge -->
-        <div class="squad-challenge-card">
-          <div class="challenge-top">
-            <span class="challenge-title">🎯 SQUAD CHALLENGE: Solve 5 Mediums</span>
-            <span class="challenge-target-sub" id="squad-challenge-target">Target: 5</span>
+        <!-- 3. Leaderboard Section -->
+        <div class="squad-section-wrap">
+          <div class="squad-section-header">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="section-label">SQUAD LEADERBOARD</span>
+              <span class="squad-live-indicator" id="squad-sync-status">● Live</span>
+            </div>
+            <button class="btn-manage-squad" id="btn-toggle-manage-squad" style="display: none;" title="Edit squad members">✏️ Edit Squad</button>
           </div>
-          <div class="progress-track">
-            <div class="progress-fill" id="squad-challenge-bar" style="width: 20%;"></div>
+          <div class="squad-manage-banner" id="squad-manage-banner" style="display: none;">
+            <span>⚡ Leader Mode: Click <strong>✕ Remove</strong> on any member to kick them.</span>
           </div>
-        </div>
-
-        <div>
-          <div class="section-label-row">
-            <span class="section-label">SQUAD LEADERBOARD</span>
-            <span class="section-subtext">Live Sync</span>
-          </div>
-          <div class="leaderboard-list-wrap" id="squad-members-list">
+          <div class="squad-leaderboard-table" id="squad-members-list">
             <!-- Populated dynamically -->
           </div>
         </div>
 
-        <div>
-          <div class="section-label-row">
-            <span class="section-label">ACTIVITY FEED</span>
+        <!-- 4. Recent Activity Timeline -->
+        <div class="squad-section-wrap">
+          <div class="squad-section-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="section-label">RECENT ACTIVITY</span>
+            <button class="btn-clear-feed" id="btn-clear-activity-feed" title="Clear all recent activity">Clear ✕</button>
           </div>
-          <div class="activity-feed-col" id="squad-activity-feed">
-            <div class="empty-state-notice">No recent activity. Solve a problem to light up the feed!</div>
+          <div class="squad-timeline-container" id="squad-activity-feed">
+            <div class="timeline-empty-notice">No recent squad activity.</div>
           </div>
         </div>
       </section>
 
       <!-- 3. DUELS VIEW -->
       <section id="view-duels" class="tab-view">
+        <!-- Incoming Duel Challenge Invitations Container -->
+        <div id="incoming-duels-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
+
+        <!-- Main Duel Game Card -->
         <div class="duel-game-card">
           <div class="section-label-row" style="margin-bottom: 0;">
             <span class="section-label">1V1 PROBLEM RACE</span>
           </div>
-          <p class="game-subhead">Challenge a squad mate to a live speed race. First accepted LeetCode submission wins.</p>
+          <!-- 0. Incoming Challenges Container -->
+          <div id="incoming-duels-container" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
 
-          <div class="duel-setup-form" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- 1. Setup Form -->
+          <div id="duel-setup-form" class="duel-setup-form" style="display: flex; flex-direction: column; gap: 10px;">
             <div class="form-field-group">
               <label class="field-label">Opponent:</label>
               <select id="duel-opponent-select" class="select-flat">
@@ -297,6 +355,7 @@
               <label class="field-label">Format:</label>
               <select id="duel-problem-select" class="select-flat">
                 <option value="random_blind75">Blind 75 · Random Problem</option>
+                <option value="random_neetcode150">NeetCode 150 · Random Problem</option>
                 <option value="daily">Today's Daily Challenge</option>
                 <option value="random_easy">Speed Sprint · Easy</option>
                 <option value="random_hard">Boss Fight · Hard</option>
@@ -306,16 +365,31 @@
             <button class="btn-cta-solve" id="btn-start-duel" style="justify-content: center; padding: 8px;">Start Duel Match</button>
           </div>
 
+          <!-- 2. Active Match HUD -->
           <div id="active-duel-box" class="duel-match-hud" style="display: none;">
             <div class="match-hud-top">
               <span class="match-badge">MATCH IN PROGRESS</span>
               <span class="match-timer" id="duel-live-timer">00:00</span>
             </div>
-            <div style="font-size: 13px; font-weight: 600;" id="active-duel-problem-title">Two Sum</div>
-            <div style="display: flex; gap: 8px;">
-              <a href="https://leetcode.com/problems/two-sum/" target="_blank" class="btn-secondary-flat" id="active-duel-link" style="flex: 1; text-align: center; text-decoration: none;">Open Problem ↗</a>
-              <button class="btn-secondary-flat" id="btn-cancel-duel">Forfeit</button>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
+              <span style="font-size: 13px; font-weight: 700;" id="active-duel-problem-title">🔒 Problem Hidden (Reveals on Accept)</span>
+              <span class="diff-tag" id="active-duel-diff">Medium</span>
             </div>
+            <div class="duel-opponent-status-row" id="active-duel-opponent-status">
+              <span class="status-pulse-dot">🟢</span>
+              <span id="active-duel-opponent-text">Waiting for opponent...</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 6px;">
+              <button class="btn-cta-solve" id="active-duel-link" style="flex: 1; text-align: center; justify-content: center; padding: 6px; pointer-events: none; opacity: 0.5;">🔒 Reveals on Accept</button>
+              <button class="btn-secondary-flat" id="btn-cancel-duel" style="color: var(--color-hard);">Forfeit</button>
+            </div>
+          </div>
+
+          <!-- 3. Match Result Banner -->
+          <div id="duel-result-box" class="duel-result-hud" style="display: none;">
+            <div class="result-badge-title" id="duel-result-title">🏆 VICTORY!</div>
+            <div class="result-desc" id="duel-result-desc">You solved the problem first! +50 XP awarded.</div>
+            <button class="btn-secondary-flat" id="btn-dismiss-duel-result" style="margin-top: 8px; width: 100%; justify-content: center;">Start New Match</button>
           </div>
         </div>
 
@@ -342,26 +416,16 @@
 
       <!-- 4. ROADMAP VIEW -->
       <section id="view-roadmap" class="tab-view">
-        <!-- Prominent Segmented Roadmap Switcher -->
-        <div class="roadmap-segmented-wrap">
-          <button class="roadmap-segment-btn active" id="btn-roadmap-blind75" data-type="blind75">
-            <span class="seg-icon">⚡</span>
-            <span class="seg-name">Blind 75</span>
-            <span class="seg-badge">75</span>
-          </button>
-          <button class="roadmap-segment-btn" id="btn-roadmap-neetcode150" data-type="neetcode150">
-            <span class="seg-icon">🚀</span>
-            <span class="seg-name">NeetCode 150</span>
-            <span class="seg-badge">150</span>
-          </button>
-        </div>
-
+        <!-- Modern Roadmap Dropdown Hero Panel -->
         <div class="roadmap-hero-panel">
           <div class="roadmap-top-bar">
-            <span class="roadmap-title-active" id="roadmap-active-title">Blind 75 Curated List</span>
-            <span class="section-subtext" id="blind75-count">0 / 75 Solved</span>
+            <select id="roadmap-type-select" class="roadmap-select-dropdown">
+              <option value="blind75">Blind 75 Roadmap (75)</option>
+              <option value="neetcode150">NeetCode 150 Roadmap (150)</option>
+            </select>
+            <span class="roadmap-stats-meta" id="blind75-count">0 / 75 Solved (0%)</span>
           </div>
-          <div class="progress-track">
+          <div class="progress-track" style="margin-top: 4px;">
             <div class="progress-fill" id="blind75-bar" style="width: 0%;"></div>
           </div>
         </div>
@@ -412,7 +476,7 @@
           <span class="section-label">USER PROFILE</span>
           <div class="form-field-group">
             <label class="field-label">Squad Display Name:</label>
-            <input type="text" id="input-display-name" placeholder="NINJA981" value="NINJA981" class="input-flat">
+            <input type="text" id="input-display-name" placeholder="Your Username" class="input-flat">
           </div>
           <div class="form-field-group" style="margin-top: 6px;">
             <label class="field-label">LeetCode Username (for live stats):</label>
@@ -469,6 +533,14 @@
               <div style="font-size: 11px; color: var(--text-muted);">Broadcast my accepted solves to the room</div>
             </div>
             <input type="checkbox" id="toggle-share-solves" checked style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-dark);">
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+            <div>
+              <div style="font-size: 12px; font-weight: 600;">Test Desktop Alerts</div>
+              <div style="font-size: 11px; color: var(--text-muted);">Trigger an instant sample notification</div>
+            </div>
+            <button class="btn-secondary-flat" id="btn-test-notification" style="font-size: 11px; padding: 4px 10px;">🔔 Send Test</button>
           </div>
         </div>
 
