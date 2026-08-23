@@ -1,283 +1,1053 @@
-# ⚡ LeetX — Comprehensive Architecture & Codebase Guide
+# ⚡ LeetX Squads — Comprehensive Technical Architecture
 
-> **Developer & AI Agent Handoff Document**
-> This guide details the complete project directory structure, subsystem workflows, function signatures, storage schemas, and developer workflows so any AI agent or developer can seamlessly resume development.
-
----
-
-## 🗺️ 1. Workspace Layout & Separation
-
-This environment consists of two distinct repositories:
-
-1. **`leetcode-submissions` (`X:\Projects\leetcode`)**:
-   - Target backup repository for solutions, problem descriptions, and test CLI scripts.
-2. **`leetsync-squads` (`X:\Projects\leetsync-squads`)**:
-   - The production Manifest V3 browser extension codebase.
-   - Remote Git Repository: [`https://github.com/NINJA981/leetsync-squads`](https://github.com/NINJA981/leetsync-squads)
+> **Developer & AI Agent Handoff Document** · v1.1.2
+> A complete technical deep-dive covering system design, data flow diagrams, API contracts, storage schemas, and developer playbooks for every subsystem in LeetX Squads.
 
 ---
 
-## 📁 2. Complete Project Directory Tree
+## 📐 Table of Contents
+
+1. [High-Level System Architecture](#1-high-level-system-architecture)
+2. [Project Directory Structure](#2-project-directory-structure)
+3. [Extension Layer Architecture](#3-extension-layer-architecture)
+4. [Data Flow Diagrams](#4-data-flow-diagrams)
+   - [4.1 GitHub Submission Sync Pipeline](#41-github-submission-sync-pipeline)
+   - [4.2 Multiplayer Squad Room Lifecycle](#42-multiplayer-squad-room-lifecycle)
+   - [4.3 1v1 Duel State Machine](#43-1v1-duel-state-machine)
+   - [4.4 Authentication & Onboarding Flow](#44-authentication--onboarding-flow)
+   - [4.5 Message Routing Bus](#45-message-routing-bus)
+5. [Subsystem Specifications](#5-subsystem-specifications)
+6. [API Reference](#6-api-reference)
+7. [State Management Schema](#7-state-management-schema)
+8. [Firestore Data Model](#8-firestore-data-model)
+9. [Squad Challenge Pool](#9-squad-challenge-pool)
+10. [Testing & Validation Playbook](#10-testing--validation-playbook)
+11. [Release Engineering](#11-release-engineering)
+
+---
+
+## 1. High-Level System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          LEETX SQUADS v1.1.2                                │
+│                     Manifest V3 Browser Extension                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  User Browser Context
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                                                                        │
+  │   ┌─────────────────┐        ┌──────────────────────────────────────┐  │
+  │   │   POPUP LAYER   │        │         CONTENT SCRIPT LAYER         │  │
+  │   │  popup/app.js   │        │          scripts/content.js          │  │
+  │   │  popup/index    │        │   Injected into leetcode.com tabs    │  │
+  │   │  popup/style    │        │                                      │  │
+  │   │                 │        │  • DOM mutation observer             │  │
+  │   │  5 Tab Views:   │        │  • Submission acceptance detector    │  │
+  │   │  ├── Stats      │        │  • In-page toast notifications       │  │
+  │   │  ├── Squad      │        │  • Confetti canvas on win            │  │
+  │   │  ├── Duels      │        │  • Auth session username scraper     │  │
+  │   │  ├── Roadmap    │        │  • LeetCode GraphQL API proxy        │  │
+  │   │  └── Settings   │        │                                      │  │
+  │   └────────┬────────┘        └──────────────┬───────────────────────┘  │
+  │            │  chrome.runtime.sendMessage()   │                          │
+  │            │ ◄───────────────────────────────┘                          │
+  │            │                                                            │
+  │   ┌────────▼────────────────────────────────────────────────────────┐  │
+  │   │              BACKGROUND SERVICE WORKER                          │  │
+  │   │                  scripts/background.js                          │  │
+  │   │                                                                  │  │
+  │   │  chrome.alarms.onAlarm   chrome.runtime.onMessage               │  │
+  │   │  ├── daily_streak_check  ├── PROBLEM_SOLVED / SYNC_SUBMISSION    │  │
+  │   │  └── squad_presence_poll ├── GET_DUEL_HISTORY                   │  │
+  │   │                          ├── CHECK_DUEL_STATUS                  │  │
+  │   │                          ├── BACKFILL_SOLUTIONS                 │  │
+  │   │                          └── SEND_DUEL_CHALLENGE                │  │
+  │   │                                                                  │  │
+  │   │  Imports: GitHubAPI · LeetCodeAPI · FirebaseSquads               │  │
+  │   └───┬─────────────────────┬────────────────────────┬─────────────┘  │
+  │       │                     │                        │                  │
+  └───────┼─────────────────────┼────────────────────────┼──────────────────┘
+          │                     │                        │
+          ▼                     ▼                        ▼
+  ┌───────────────┐   ┌─────────────────┐   ┌──────────────────────────┐
+  │   GITHUB API  │   │  LEETCODE API   │   │  GOOGLE CLOUD FIRESTORE  │
+  │ api.github.com│   │ leetcode.com/   │   │  firestore.googleapis.com│
+  │               │   │ graphql         │   │                          │
+  │ • User auth   │   │                 │   │  Collections:            │
+  │ • Repo create │   │ • User stats    │   │  ├── squads/{code}       │
+  │ • Git Trees   │   │ • Submissions   │   │  └── duels/{duelId}      │
+  │ • README sync │   │ • Daily problem │   │                          │
+  │ • File reads  │   │ • Problem meta  │   │  Real-time multiplayer   │
+  └───────────────┘   └─────────────────┘   └──────────────────────────┘
+```
+
+---
+
+## 2. Project Directory Structure
 
 ```
 X:\Projects\leetsync-squads/
-├── manifest.json                  # Manifest V3 configuration (permissions, service worker, icons, content scripts)
-├── README.md                      # Public project documentation & 10-second installation guide
-├── PROJECT_ARCHITECTURE.md        # Comprehensive technical architecture & handoff guide (This file)
-├── firebase.json                  # Firebase deployment configuration for Firestore rules
-├── firestore.rules                # Firestore security rules (read/write access for squad rooms & duels)
-├── .firebaserc                    # Firebase project identifier mapping (leetsync-squads-app)
-├── popup/
-│   ├── index.html                 # Complete popup DOM: Onboarding Gateway, 5-Tab App Container, Drawer, Toasts
-│   ├── style.css                  # Design system: Light Mode + Linear/Obsidian Slate Dark Mode ([data-theme="dark"])
-│   └── app.js                     # Main popup controller, UI rendering, event listeners, and data binding
-├── scripts/
-│   ├── background.js              # Manifest V3 service worker (alarms, async GitHub sync engine, notifications, routing)
-│   ├── content.js                 # Content script injected into leetcode.com (DOM observer, in-page session syncer, confetti)
-│   ├── github.js                  # GitHub API client (ensureRepository, Git Trees commit, difficulty folders, README catalog)
-│   ├── leetcode.js                # LeetCode GraphQL API client (getUserStats, getDailyChallenge, submission history)
-│   ├── firebase.js                # Real-time Squad Relay (joinOrCreateSquad, leadership, kick/leave, 25 challenge cycler, 1v1 duels)
-│   └── package.py                 # Automated build script (reads manifest version, builds dist zip, copies to Downloads)
+│
+├── manifest.json                   # MV3: permissions, alarms, identity, service worker
+├── README.md                       # Public documentation & laptop setup guide
+├── PROJECT_ARCHITECTURE.md         # This file — full technical architecture reference
+├── firebase.json                   # Firebase Hosting/Firestore rules config
+├── firestore.rules                 # Firestore read/write security policy
+├── .firebaserc                     # Firebase project ID: leetsync-squads-app
+├── .gitignore                      # Excludes node_modules, __pycache__, scratch/, old dist/
+│
+├── popup/                          # ─── POPUP LAYER (visible to user) ───
+│   ├── index.html                  # Complete popup DOM (611 lines)
+│   │   ├── #onboarding-container   # First-time GitHub auth gateway
+│   │   ├── #app-container          # Main 5-tab companion dashboard
+│   │   │   ├── #view-dashboard     # Stats, streak, donut, GitHub sync
+│   │   │   ├── #view-squad         # Squad rooms, leaderboard, challenges
+│   │   │   ├── #view-duels         # 1v1 matchmaking & live HUD
+│   │   │   ├── #view-roadmap       # Blind 75 / NeetCode 150 browser
+│   │   │   └── #view-settings      # Token, theme, notifications
+│   │   └── #problem-drawer         # Slide-over notes & spaced review
+│   ├── style.css                   # 2687-line design system
+│   │   ├── :root variables         # Light mode tokens
+│   │   ├── [data-theme="dark"]     # Obsidian Slate dark mode tokens
+│   │   ├── Onboarding screen       # Brand lockup, instructions, CTA
+│   │   ├── Tab nav                 # Nav bar, active indicator
+│   │   └── All view components     # Cards, leaderboards, duel HUD, roadmap
+│   └── app.js                      # Main controller (1800+ lines)
+│
+├── scripts/                        # ─── LOGIC LAYER (ES Modules) ───
+│   ├── background.js               # MV3 Service Worker (740 lines)
+│   │   ├── chrome.alarms           # Streak check (hourly) + squad poll (every 1 min)
+│   │   ├── chrome.runtime.onMessage# Central message bus router
+│   │   ├── sendDesktopNotification # OS native notification dispatcher
+│   │   ├── updateDailyStreakState  # Date-rollover streak reconciliation
+│   │   └── startAsyncGitHubSync    # Background backfill coordinator
+│   ├── content.js                  # LeetCode DOM observer (676 lines)
+│   │   ├── __LEETSYNC_SQUADS_INJECTED__ guard
+│   │   ├── MutationObserver        # Watches for submission accepted banner
+│   │   ├── showVictoryToast        # In-page ⚡ sync toast notification
+│   │   ├── launchConfetti          # Canvas confetti on duel win
+│   │   └── showInPageAlert         # Duel challenge banner overlay
+│   ├── github.js                   # GitHub REST API client (515 lines)
+│   │   ├── class GitHubAPI         # Authenticated instance with Bearer token
+│   │   ├── request()               # Base fetch wrapper with error handling
+│   │   ├── ensureRepository()      # Auto-creates leetcode-submissions repo
+│   │   ├── commitProblemSolution() # Git Trees atomic commit (3-retry loop)
+│   │   └── updateCatalogReadme()   # Regenerates problem table README
+│   ├── leetcode.js                 # LeetCode GraphQL client (450+ lines)
+│   │   ├── class LeetCodeAPI       # Static-only method class
+│   │   ├── query()                 # Authenticated GraphQL POST with cookies
+│   │   ├── getUserStats()          # Solve counts + streak calendar
+│   │   ├── getDailyChallenge()     # Today's daily problem
+│   │   └── fetchAllAcceptedSubmissions() # Full submission history paginator
+│   ├── firebase.js                 # Firestore real-time relay (921 lines)
+│   │   ├── class FirebaseSquads    # Static-only method class
+│   │   ├── REST primitives         # getDocument, setDocument, deleteDocument
+│   │   ├── Squad lifecycle         # joinOrCreateSquad, leaveSquad, kickMember
+│   │   ├── Squad challenges        # 25-challenge pool, isSolveMatchingChallenge
+│   │   ├── Activity feed           # broadcastSolve, sendNudge, clearActivityFeed
+│   │   └── Duel lifecycle          # createDuel, acceptDuel, submitDuelSolve, forfeit
+│   └── package.py                  # Release build script (89 lines)
+│       └── package_extension(bump) # Builds Chrome + Firefox zip archives
+│
 ├── styles/
-│   └── content.css                # In-page UI enhancements, confetti canvas, and victory toast banners on leetcode.com
+│   └── content.css                 # In-page UI styles (injected into leetcode.com)
+│       ├── #leetsync-victory-toast # Solve confirmation toast
+│       ├── .leetsync-toast-*       # Toast inner components
+│       └── @keyframes animations   # Enter/leave slide transitions
+│
 ├── assets/
 │   ├── data/
-│   │   ├── blind75.json           # Canonical Blind 75 dataset (75 problems with id, title, slug, diff, category)
-│   │   └── neetcode150.json       # Canonical NeetCode 150 dataset (150 problems across 18 DSA categories)
+│   │   ├── blind75.json            # 75 problems: {id, title, slug, difficulty, category}
+│   │   └── neetcode150.json        # 150 problems across 18 DSA categories
 │   └── icons/
-│       ├── icon16.png             # 16x16 toolbar icon
-│       ├── icon48.png             # 48x48 extensions management icon
-│       └── icon128.png            # 128x128 high-res store icon & desktop notification avatar
-├── dist/
-│   ├── leetsync-squads-v1.1.2.zip         # Current versioned production Chrome/Edge/Brave package
-│   └── leetsync-squads-firefox-v1.1.2.zip # Current versioned production Firefox AMO package
+│       ├── icon16.png              # Toolbar icon (16×16)
+│       ├── icon48.png              # Extensions manager icon (48×48)
+│       └── icon128.png             # High-res store & notification icon (128×128)
+│
+├── dist/                           # Release packages (auto-generated)
+│   ├── leetx-v1.1.2.zip            # Chrome / Edge / Brave / Arc MV3
+│   └── leetx-firefox-v1.1.2.zip    # Firefox AMO MV3 with scripts fallback
+│
 ├── scratch/
-│   ├── feature_verification.js    # Comprehensive automated 39-assertion test suite
-│   └── clean_firestore.js         # Full Firestore database purge utility
+│   ├── feature_verification.js     # 39-assertion automated subsystem test suite
+│   └── clean_firestore.js          # Full Firestore database purge utility
+│
 └── tests/
-    └── test_extension.py          # Python unittest test suite verifying manifest, datasets, and scripts
+    ├── e2e_full_suite.js            # 31-test comprehensive E2E test suite
+    └── test_extension.py           # 6 Python unit tests (manifest, datasets, scripts)
 ```
 
 ---
 
-## ⚙️ 3. Core Subsystems & How They Work
+## 3. Extension Layer Architecture
 
-### 🚪 Subsystem 1: First-Time Onboarding Gateway & Auth Gatekeeper
-- **Source Files**: `popup/index.html`, `popup/app.js` (`checkAuthAndInitialize`, `handleLinkToken`).
-- **How It Works**:
-  1. On popup open, `checkAuthAndInitialize()` queries `chrome.storage.local.get(['github_token'])`.
-  2. If `!github_token`, the main dashboard (`#app-container`) is completely hidden, and the `#onboarding-container` is displayed.
-  3. The user clicks **"1. Open GitHub & Generate Token ↗"**, opening `https://github.com/settings/tokens/new?description=LeetSync+Squads&scopes=repo` in a new tab with pre-checked scopes.
-  4. The user pastes their token into `#input-onboard-token` and clicks **"Unlock ⚡"**.
-  5. `handleLinkToken(token)` verifies the token via `GitHubAPI.getUser()`, calls `GitHubAPI.ensureRepository('leetcode-submissions')` (which auto-creates the repo if missing), saves credentials to `chrome.storage.local`, and unlocks the full 5-tab companion dashboard!
+LeetX Squads follows the **Manifest V3** architecture with strict separation of concerns across three extension contexts that communicate exclusively via message passing.
 
----
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  CONTEXT 1: Popup Page                                                   │
+│  ┌─────────────┐   Reads/Writes    ┌──────────────────────────────────┐ │
+│  │  popup/     │ ◄──────────────── │    chrome.storage.local          │ │
+│  │  app.js     │ ────────────────► │    (single source of UI truth)   │ │
+│  │             │                   └──────────────────────────────────┘ │
+│  │  Triggers   │                                                         │
+│  │  chrome.    │ ────────────────► CONTEXT 2 (background.js)            │
+│  │  runtime.   │                   via sendMessage()                     │
+│  │  sendMessage│                                                         │
+│  └─────────────┘                                                         │
+└──────────────────────────────────────────────────────────────────────────┘
 
-### 📊 Subsystem 2: Continuous Stats Dashboard & Authentic Metrics
-- **Source Files**: `popup/index.html` (`#view-dashboard`), `popup/app.js` (`loadStoredState`, `fetchAndUpdateUserStats`), `scripts/leetcode.js`, `scripts/content.js`.
-- **How It Works**:
-  1. **Daily Momentum Hero**: Displays dynamic consecutive day streak (`0` on fresh install), active 7-day strip (Mon-Sun), and completion status (`Pending ⏳` or `Completed ✓`).
-  2. **In-Page Live Session & Stats Syncer (`content.js`)**:
-     - Runs natively inside `leetcode.com` with authenticated session cookies.
-     - Scrapes and queries authenticated username handle and solve metrics.
-     - Automatically updates `chrome.storage.local` on page load and submission acceptance.
-  3. **Progress Donut Chart**: Pure SVG multi-segment donut chart visualizing Easy (Emerald), Medium (Amber), and Hard (Rose) problem breakdown.
-  4. **Smart DSA Focus Coaching**: Dynamically analyzes user's solved roadmap categories and highlights least-completed topics (e.g. *Arrays & Trees*, *Dynamic Programming*).
-  5. **Next Challenge Launcher**: Queries LeetCode's active daily coding challenge and launches it with 1 click.
+┌──────────────────────────────────────────────────────────────────────────┐
+│  CONTEXT 2: Background Service Worker                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐ │
+│  │  background.js                                                       │ │
+│  │                                                                      │ │
+│  │  Receives from Popup:          Receives from Content Script:         │ │
+│  │  ┌─────────────────────┐      ┌──────────────────────────────────┐  │ │
+│  │  │ BACKFILL_SOLUTIONS  │      │ PROBLEM_SOLVED / SYNC_SUBMISSION  │  │ │
+│  │  │ CHECK_DUEL_STATUS   │      │ GET_USER_SESSION                  │  │ │
+│  │  │ SEND_DUEL_CHALLENGE │      │ GET_USER_STATS                    │  │ │
+│  │  │ GET_DUEL_HISTORY    │      └──────────────────────────────────┘  │ │
+│  │  └─────────────────────┘                                             │ │
+│  │                                                                      │ │
+│  │  Orchestrates:                                                       │ │
+│  │  ├── GitHubAPI.commitProblemSolution()   → api.github.com            │ │
+│  │  ├── GitHubAPI.updateCatalogReadme()     → api.github.com            │ │
+│  │  ├── LeetCodeAPI.getSubmissionDetails()  → leetcode.com/graphql      │ │
+│  │  └── FirebaseSquads.*                    → firestore.googleapis.com  │ │
+│  └─────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────┘
 
----
-
-### 🗺️ Subsystem 3: Curated Roadmaps (Blind 75 vs NeetCode 150)
-- **Source Files**: `popup/index.html` (`#view-roadmap`), `popup/app.js` (`loadRoadmap`, `renderRoadmapList`, `updateNextRecommendation`), `assets/data/blind75.json`, `assets/data/neetcode150.json`.
-- **How It Works**:
-  1. **Segmented Switcher**: High-contrast toggle between **Blind 75 (75 problems)** and **NeetCode 150 (150 problems)**.
-  2. **Canonical Datasets**: `blind75.json` contains 75 curated problems; `neetcode150.json` contains 150 problems across 18 DSA categories.
-  3. **Horizontal Category Pill Strip**: Filter buttons (`All`, `Arrays`, `Pointers`, `Window`, `Stack`, `Binary`, `Trees`, `DP`...) with smooth overflow scrolling.
-  4. **Next For You**: Automatically analyzes `userSolvedSlugs` and points to the next unsolved problem in the active roadmap.
-  5. **Notes & Spaced Review Drawer**: Clicking 📝 on any problem opens a slide-over sheet to write personal approach notes and schedule spaced revisit reminders (`+3d`, `+7d`, `+14d`, `+30d`).
-
----
-
-### 👥 Subsystem 4: Multiplayer Squad Rooms, Leadership & 25-Challenge Cycler
-- **Source Files**: `popup/index.html` (`#view-squad`), `popup/app.js` (`renderSquadView`), `scripts/firebase.js`.
-- **How It Works**:
-  1. **Collision-Free 6-Character Room Codes**: Users click **+ New** to generate a unique, unambiguous 6-character room code (e.g. `#K9X2P4`, excluding confusing characters `0/O/1/I`) verified against Firestore.
-  2. **Code-Only Invites**: Joining and inviting is strictly code-based (1-click **Copy Code** button).
-  3. **Squad Leadership & Management Mode**:
-     - Room creator is recorded as `squad.owner` (Squad Leader with `👑 Leader` tag).
-     - The leader has an interactive **`✏️ Edit Squad`** toggle.
-     - In normal view, leaderboard rows are clean and uncluttered.
-     - In Edit Mode, `✕ Remove` kick buttons appear next to squad members, allowing the leader to remove members via `FirebaseSquads.kickMember()`.
-  4. **Leave Squad**: Members can leave a room at any time via `FirebaseSquads.leaveSquad()`. If the leader leaves, leadership automatically transfers to the next senior member.
-  5. **Live Leaderboard & Peer Nudges**: Real-time member stats, daily solve badges (`✓ Done` / `⏳ Pending`), active streaks (`🔥 12d`), and interactive `👋 Nudge` actions.
-  6. **25 Squad Challenges Engine**:
-     - Curated pool of 25 diverse team challenges across DP, Graphs, Trees, Heaps, Stacks, Blind 75, NeetCode 150, and Speed Sprints.
-     - Strict condition matching via `FirebaseSquads.isSolveMatchingChallenge()` ensures only problems that genuinely match the active category increment the challenge tracker.
-     - When the target is cleared, bonus XP (+100 to +250 XP) is awarded to all squad members, a celebration event is posted to the activity feed, and the room automatically cycles to a new random challenge without immediate repetition.
-  7. **Clear Activity Feed Button**: Clicking **`Clear ✕`** in the activity header resets the on-screen feed, clears Firestore feed logs, and resets challenge progress back to `0 / Target`.
-
----
-
-### ⚔️ Subsystem 5: 1v1 Algorithmic Duels & Matchmaking
-- **Source Files**: `popup/index.html` (`#view-duels`), `popup/app.js` (`renderDuelsView`), `scripts/background.js`, `scripts/firebase.js`, `scripts/content.js`.
-- **How It Works**:
-  1. **Dispatched Challenges**: Challenger selects an opponent and format (Random Blind 75, NeetCode 150, Daily, Easy sprint, Hard boss fight).
-  2. **Background Desktop Alerts**: When a challenge is dispatched, the opponent's device receives a native desktop notification (`⚔️ 1v1 Duel Challenge from @challenger`).
-  3. **Concealed Problem & Disabled Links (Pending)**: While waiting for acceptance, the problem title shows `🔒 Problem Hidden (Reveals on Accept)`, the LeetCode link is disabled, and the stopwatch is held at `00:00 (Starts on Accept)`.
-  4. **Multi-Invite Queue**: On the Duels page, `#incoming-duels-container` dynamically renders cards for **all** pending incoming invitations with individual `[ Accept ⚔️ ]` and `[ Decline ]` buttons.
-  5. **Acceptance & Simultaneous Reveal**: When accepted, a desktop alert is dispatched (`⚔️ DUEL MATCH STARTED! Problem revealed: ...`), the timer begins ticking synchronously for both players, and the problem link unlocks.
-  6. **Instant 0ms Cache Load**: Reopening the extension immediately renders the active duel HUD from `chrome.storage.local` cache, completely eliminating any loading latency or flash of the setup form.
-  7. **Single-Click Match Dismissal**: The "Start New Match" button immediately clears completed match state in a single click without redundant re-renders.
-  8. **Atomic First-to-Submit Resolution**:
-     - The instant LeetCode returns "Accepted", `content.js` dispatches `SYNC_SUBMISSION` to `background.js`.
-     - The first solver to reach Firestore claims `winner = username` and completes the match.
-     - Winner receives +50 XP, runner-up receives +15 XP, confetti explodes on the winner's LeetCode tab, and the match results update live.
+┌──────────────────────────────────────────────────────────────────────────┐
+│  CONTEXT 3: Content Script (leetcode.com tabs only)                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐ │
+│  │  content.js                                                          │ │
+│  │                                                                      │ │
+│  │  Injected at: document_idle                                          │ │
+│  │  Matches: https://leetcode.com/problems/*                            │ │
+│  │                                                                      │ │
+│  │  MutationObserver ────► "Accepted" banner detected                   │ │
+│  │                               │                                      │ │
+│  │                    chrome.runtime.sendMessage(SYNC_SUBMISSION)       │ │
+│  │                               │                                      │ │
+│  │                               ▼                                      │ │
+│  │              Background.js processes & syncs to GitHub               │ │
+│  │                               │                                      │ │
+│  │              Background.js responds with SHOW_INPAGE_NOTIFICATION    │ │
+│  │                               │                                      │ │
+│  │                    showVictoryToast() ◄───────────────────────────── │ │
+│  └─────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-### ⚡ Subsystem 6: GitHub Directory Organization & README Catalog
-- **Source Files**: `scripts/background.js` (`startAsyncGitHubSync`), `scripts/github.js`, `popup/app.js` (`performSolutionSync`, `renderSyncStatusUI`).
-- **How It Works**:
-  1. **Difficulty-Based Zero-Padded Directory Structure**:
-     - Solutions are organized into clean difficulty tiers with 4-digit zero-padded problem IDs:
-       - `Easy/0001-two-sum/README.md` & `solution.py`
-       - `Medium/0049-group-anagrams/README.md` & `solution.py`
-       - `Hard/0042-trapping-rain-water/README.md` & `solution.py`
-     - The root repository view displays only `Easy/`, `Medium/`, `Hard/`, and `README.md`.
-  2. **Multi-Tier README Difficulty Resolver**:
-     - `updateCatalogReadme()` dynamically parses problem difficulties using:
-       1. Folder prefix tier (`Easy/`, `Medium/`, `Hard/`).
-       2. Git blob README badge regex (`Difficulty-Easy`, `Difficulty-Medium`, `Difficulty-Hard`).
-       3. LeetCode GraphQL query fallback.
-     - Clicking "Sync All Solutions Now" always regenerates the root README catalog even if 0 new problems were committed.
-  3. **Detached Background Execution**:
-     - The service worker processes the entire backfill asynchronously in the background.
-     - **Popup Closure Resilience**: The user can close the extension popup or switch tabs; the sync continues without interruption.
-  4. **Live UI Status Streaming**:
-     - Progress (`pct`, `current`, `total`, `message`) is persisted in `chrome.storage.local.sync_status`.
-     - Open popups reactively stream the real-time progress bar and commit status via `chrome.storage.onChanged`.
-  5. **Git Trees Direct Commit Engine**:
-     - Commits problem descriptions and solutions atomically with exact runtime (ms), memory (MB), and percentile rankings.
-     - Uses `force: true` branch ref updates, a 3-attempt auto-retry loop with cache-busted SHA queries (`?_cb=${Date.now()}`), and 150ms batch commit pacing to prevent GitHub `422: Update is not a fast forward` errors.
+## 4. Data Flow Diagrams
+
+### 4.1 GitHub Submission Sync Pipeline
+
+```
+User solves a LeetCode problem → "Accepted" result page
+         │
+         ▼
+┌─────────────────────────────────────────────┐
+│  content.js (MutationObserver)              │
+│  Detects "Accepted" banner in DOM           │
+│  Extracts: titleSlug, submissionId          │
+└──────────────────────┬──────────────────────┘
+                       │ chrome.runtime.sendMessage
+                       │ { type: 'SYNC_SUBMISSION', ... }
+                       ▼
+┌─────────────────────────────────────────────┐
+│  background.js (Message Handler)            │
+│                                             │
+│  1. Gets stored { github_token,             │
+│                   github_repo_owner,        │
+│                   my_squad_code }           │
+│                                             │
+│  2. Calls LeetCodeAPI.getSubmissionDetails  │
+│     → Fetches: code, runtime, memory,       │
+│       percentile rankings from GraphQL      │
+│                                             │
+│  3. Calls LeetCodeAPI.getQuestionDetails    │
+│     → Fetches: difficulty, topic tags,      │
+│       problem statement HTML                │
+└──────────────┬──────────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────────┐
+│  GitHubAPI.commitProblemSolution()          │
+│                                             │
+│  Builds directory path:                     │
+│  Easy/0001-two-sum/                         │
+│  ├── README.md  (problem statement)         │
+│  └── solution.py (user's code)              │
+│                                             │
+│  Git Trees API (atomic multi-file commit):  │
+│  1. GET /repos/{owner}/{repo}/git/          │
+│     ref/heads/main → latest SHA            │
+│  2. POST /git/trees (with blobs)            │
+│  3. POST /git/commits (backdated timestamp) │
+│  4. PATCH /git/refs/heads/main              │
+│                                             │
+│  Retry Logic: 3 attempts, 400ms backoff     │
+│  Cache-bust: ?_cb=Date.now() on SHA queries │
+└──────────────┬──────────────────────────────┘
+               │
+               ├──────────────────────────────────────────────┐
+               ▼                                              ▼
+┌──────────────────────────────┐             ┌───────────────────────────────┐
+│  GitHubAPI.updateCatalog     │             │  FirebaseSquads.broadcastSolve│
+│  Readme()                    │             │                               │
+│                              │             │  • Updates member's stats     │
+│  Scans repo tree for all     │             │  • Increments challenge count │
+│  problems → builds sorted    │             │  • Awards squad XP if goal met│
+│  Markdown table → commits to │             │  • Posts to squad activity    │
+│  README.md                   │             │    feed (solve event)         │
+└──────────────────────────────┘             └───────────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────────┐
+│  background.js → content.js                 │
+│  chrome.tabs.sendMessage(SHOW_INPAGE_NOTIF) │
+│                                             │
+│  content.js renders:                        │
+│  🔥 LeetX Squads                            │
+│  ⚡ Synced                                  │
+│  ⏱️ 35ms (Beats 98.4%) | 🧠 16.4MB (82.1%) │
+└─────────────────────────────────────────────┘
+```
 
 ---
 
-## 📚 4. Class & Function API Reference
+### 4.2 Multiplayer Squad Room Lifecycle
 
-### `scripts/github.js` (`GitHubAPI`)
-- `constructor(token)`: Initializes GitHub API instance with Bearer token.
-- `async request(endpoint, options)`: Wrapper around `fetch('https://api.github.com' + endpoint)` with JSON handling.
-- `async getUser()`: Fetches authenticated user info (`/user`).
-- `async getUserRepos()`: Lists authenticated user's repositories (`/user/repos`).
-- `async ensureRepository(repoName)` *(instance)*: Verifies repo exists; auto-creates with description if 404.
-- `static async ensureRepository(repoName, token)` *(static)*: Static helper wrapper.
-- `async commitProblemSolution(owner, repo, payload)`: Commits solution into `Easy/`, `Medium/`, or `Hard/` directory with zero-padded problem IDs.
-- `async updateCatalogReadme(owner, repo, branch)`: Regenerates and commits the root `README.md` problem table with multi-tier difficulty resolution.
-- `async getExistingProblemSlugs(owner, repo, branch)`: Scans repository tree to find all existing solution folders across all difficulty directories.
-- `static async requestDeviceCode()`: Initiates GitHub OAuth Device Code Flow.
-- `static async pollForAccessToken(deviceCode)`: Polls for OAuth token during device flow.
+```
+                        SQUAD ROOM LIFECYCLE
+                        ─────────────────────
 
-### `scripts/leetcode.js` (`LeetCodeAPI`)
-- `static async query(query, variables)`: Sends authenticated GraphQL POST to `https://leetcode.com/graphql` with cookies.
-- `static async getCurrentUser()`: Queries active browser session on LeetCode (`userStatus.username`).
-- `static async getUserStats(username)`: Queries solve counts (`all`, `easy`, `medium`, `hard`) and streak calendar.
-- `static async getDailyChallenge()`: Queries active daily coding challenge (`id`, `title`, `slug`, `difficulty`, `url`, `topics`).
-- `static async fetchAllAcceptedSubmissions(onProgress, username)`: Paginates through `submissionList` to collect all accepted solutions.
-- `static async getSubmissionDetails(submissionId)`: Fetches full solution code, runtime metrics, and problem description.
-- `static async getQuestionDetails(titleSlug)`: Fetches complete question metadata and topic tags.
+  Player A                 Firestore                Player B
+  ─────────                ─────────                ─────────
 
-### `scripts/firebase.js` (`FirebaseSquads`)
-- `static cleanCode(code)`: Normalizes room code string (e.g. `#algo99` ➔ `ALGO99`).
-- `static generateRandomCode(length)`: Generates unambiguous random string (excludes `0/O/1/I`).
-- `static async generateUniqueRoomCode()`: Generates and checks Firestore to ensure collision-free 6-char room code.
-- `static getRandomChallenge(excludeId)`: Randomly selects a challenge from the 25 pool without immediate repetition.
-- `static isSolveMatchingChallenge(challenge, problemData)`: Strictly validates whether a solve satisfies challenge category rules.
-- `static async joinOrCreateSquad(roomCode, userProfile)`: Upserts user profile in the squad and records room creator as `squad.owner`.
-- `static async leaveSquad(roomCode, username)`: Removes user from squad and reassigns leadership if leader leaves.
-- `static async kickMember(roomCode, targetUsername, actorUsername)`: Allows squad leader to remove a member.
-- `static async sendNudge(roomCode, targetUsername, fromUsername)`: Records a nudge event in the squad activity feed.
-- `static async broadcastSolve(roomCode, username, problemData, currentStreak)`: Records solve, updates member stats, and advances matching challenge.
-- `static async clearActivityFeed(roomCode)`: Clears squad activity feed and resets challenge progress back to `0`.
-- `static async createDuel({ roomCode, challenger, opponent, format, problem })`: Creates match document in `duels/{duelId}`.
-- `static async acceptDuel(duelId, username)`: Activates duel match, sets `startedAt`, reveals problem, and posts `duel_accepted`.
-- `static async declineDuel(duelId, username)`: Declines incoming duel invite.
-- `static async forfeitDuel(duelId, username)`: Forfeits match and awards win to opponent.
-- `static async submitDuelSolve(duelId, username, runtimeData)`: Concludes duel, sets winner, and awards +50 XP.
-- `static async checkDuelStatus(username, roomCode)`: Syncs active match and collects all incoming duel challenges.
+  Click "+ New"
+       │
+       ▼
+  generateUniqueRoomCode()
+  ├── generateRandomCode(6)
+  │   charset: [2-9A-HJ-NP-Z]
+  │   excludes: 0, O, 1, I
+  └── fetchRemoteSquad()
+      → 404? → code is free!
+       │
+       ▼
+  joinOrCreateSquad()  ──────────────────►  squads/K9X2P4
+       │               creates document     {
+       │                                      owner: "AliceGH",
+       │                                      members: [{
+  User copies #K9X2P4                           username, streak,
+  and shares with B                             todaySolved, xp
+                                              }],
+                                              challenge: {
+                                                id, name, category,
+                                                target: 5, progress: 0
+                                              },
+                                              activityFeed: [],
+                                              lastActive: timestamp
+                                            }
+                                                │
+                        ◄───────────────────────┘
+  Alice's Squad tab           background.js squad_presence_poll
+  renders live:               (every 60 seconds)
+  ┌────────────────┐
+  │ SQUAD ROOM     │          Player B types #K9X2P4
+  │ #K9X2P4        │          and clicks Join
+  │                │                │
+  │ 👑 AliceGH     │                ▼
+  │ 🔥 12d ✓ Done  │          joinOrCreateSquad()  ──►  squads/K9X2P4
+  │                │          (upsert BobDev)            members: [Alice, Bob]
+  │ 🏆 CHALLENGE   │
+  │ Solve 5 Trees  │◄─────────────────────────────────  live poll update
+  │ ████░░  3/5    │
+  └────────────────┘
 
-### `scripts/package.py`
-- `package_extension(bump)`: Reads current version from `manifest.json`, optionally bumps semver (`patch`, `minor`, `major`), builds `dist/leetsync-squads-v<version>.zip` and `dist/leetsync-squads-firefox-v<version>.zip`, and copies both to `~/Downloads/`.
+  ──── SQUAD EVENTS ────────────────────────────────────────────────────────
 
----
+  Alice solves a Tree problem
+       │
+       ▼
+  background.js → FirebaseSquads.broadcastSolve()
+       │
+       ├── Updates Alice's member stats (todaySolved, streak, xp)
+       ├── isSolveMatchingChallenge(challenge, {category: "Trees"})
+       │   ✓ MATCH → challenge.progress = 4 → saved to Firestore
+       └── Posts activityFeed: { type: "solve", username: "Alice", ... }
 
-## 🗄️ 5. State Management Schema (`chrome.storage.local`)
+  Alice sends a Nudge to Bob
+       │
+       └── FirebaseSquads.sendNudge() → activityFeed: { type: "nudge", ... }
+           Bob's poll fetches update → desktop notification: "👋 Nudge from Alice!"
 
-| Storage Key | Type | Default | Description |
-| :--- | :---: | :---: | :--- |
-| `github_token` | `string` | `null` | GitHub Personal Access Token (with `repo` scope). |
-| `github_repo_owner` | `string` | `null` | Primary GitHub handle and default multiplayer identity. |
-| `github_repo_name` | `string` | `'leetcode-submissions'` | Connected backup repository name. |
-| `display_name` | `string` | `null` | Squad profile display name fallback. |
-| `leetcode_username` | `string` | `null` | LeetCode handle for live profile metrics. |
-| `streak_count` | `number` | `0` | Consecutive active streak days. |
-| `user_xp` | `number` | `0` | Total user gamification XP. |
-| `today_solved` | `number` | `0` | Number of problems solved today. |
-| `last_solved_date` | `string` | `null` | `YYYY-MM-DD` string of last solve. |
-| `user_solved_slugs`| `string[]` | `[]` | Set of unique problem slugs solved by user. |
-| `solved_easy_count`| `number` | `0` | Total Easy problems solved. |
-| `solved_med_count` | `number` | `0` | Total Medium problems solved. |
-| `solved_hard_count`| `number` | `0` | Total Hard problems solved. |
-| `total_solved` | `number` | `0` | Total problems solved across account. |
-| `my_squad_code` | `string` | `'#ALGO99'` | Active Squad Room code. |
-| `active_duel` | `object` | `null` | Cached active / pending duel document for 0ms rendering. |
-| `incoming_duel` | `object` | `null` | Cached incoming duel invitation document. |
-| `sync_status` | `object` | `{ state: 'idle' }` | Background GitHub sync progress object. |
-| `target_open_tab` | `string` | `null` | Route target set by notification click (e.g. `'duels'`). |
-| `theme_preference` | `string` | `'light'` | `'light'` or `'dark'`. |
-| `notifications_enabled` | `boolean` | `true` | Master toggle for desktop notifications. |
-| `notify_squad_solves_enabled` | `boolean` | `true` | Receive alerts when squad mates solve problems. |
-| `share_solves_enabled` | `boolean` | `true` | Broadcast own accepted solves to squad room. |
-| `review_schedule` | `object` | `{}` | Spaced review dictionary `{ slug: { id, title, dueDate } }`. |
-| `duel_wins` | `number` | `0` | Total 1v1 duel victories. |
-| `duel_matches` | `number` | `0` | Total 1v1 duel matches played. |
+  Challenge Progress = 5/5 → AUTO-CYCLE
+       │
+       ├── Awards all members +100 XP
+       ├── activityFeed: { type: "challenge_complete" }
+       └── getRandomChallenge(excludeId) → new random challenge (no repeats)
+```
 
 ---
 
-## 🧪 6. Verification, Testing & Packaging Commands
+### 4.3 1v1 Duel State Machine
 
-### Run Automated Feature Verification Suite (39 Subsystem Tests):
+```
+    ┌─────────────────────────────────────────────────────────────┐
+    │                   DUEL STATE MACHINE                         │
+    └─────────────────────────────────────────────────────────────┘
+
+    ● START
+        │
+        ▼
+    ┌─────────┐
+    │ IDLE    │  No active match. Challenger selects opponent + format
+    │         │  from squad member dropdown
+    └────┬────┘
+         │ createDuel()
+         │ Writes to duels/{duelId}:
+         │ { status: "pending", challenger, opponent,
+         │   problem: {...}, revealed: false }
+         │ Posts duel_challenge to squad activityFeed
+         ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │ PENDING                                                      │
+    │                                                              │
+    │  Challenger View:           Opponent View (poll detects):   │
+    │  ┌──────────────────┐       ┌─────────────────────────────┐ │
+    │  │ ⚔️ Duel Pending  │       │ 📩 INCOMING CHALLENGE       │ │
+    │  │ 🔒 Problem Hidden │       │ from @Alice                │ │
+    │  │ Waiting for Bob  │       │ Format: Blind 75 Random     │ │
+    │  │ ⏱️ 00:00          │       │ [ Accept ⚔️ ] [ Decline ]   │ │
+    │  └──────────────────┘       └─────────────────────────────┘ │
+    └───────────┬────────────────────────────┬────────────────────┘
+                │ acceptDuel()               │ declineDuel()
+                │                            │
+                ▼                            ▼
+    ┌─────────────────────┐          ┌──────────┐
+    │ ACTIVE              │          │ DECLINED │ → duels/{id}.status = "declined"
+    │                     │          └──────────┘
+    │ Both players see:   │
+    │ • Problem revealed  │
+    │ • Direct LC link    │
+    │ • Timer ticking     │
+    │ • startedAt set     │
+    └──────────┬──────────┘
+               │
+         ┌─────┴──────┐
+         │            │
+         ▼            ▼
+    submitDuelSolve() forfeitDuel()
+         │                │
+         ▼                ▼
+    ┌──────────┐    ┌──────────┐
+    │COMPLETED │    │FORFEITED │
+    │          │    │          │
+    │ winner   │    │ winner = │
+    │ +50 XP   │    │ opponent │
+    │ loser    │    │          │
+    │ +15 XP   │    └──────────┘
+    │ confetti │
+    └──────────┘
+
+    Status transitions (Firestore duels/{id}.status):
+    "pending" → "active" → "completed"
+                        → "forfeited"
+             → "declined"
+```
+
+---
+
+### 4.4 Authentication & Onboarding Flow
+
+```
+    Extension Icon Clicked
+           │
+           ▼
+    checkAuthAndInitialize()
+           │
+    chrome.storage.local.get(['github_token'])
+           │
+    ┌──────┴──────┐
+    │             │
+    token?       no token
+    │             │
+    ▼             ▼
+  UNLOCK       ONBOARDING GATEWAY
+  dashboard    ┌──────────────────────────────────────┐
+               │  ⚡ LeetX SQUADS                      │
+               │                                      │
+               │  Step 1: Click button                │
+               │  → Opens github.com/settings/tokens  │
+               │    with scopes=repo pre-checked      │
+               │                                      │
+               │  Step 2: Copy token (ghp_...)         │
+               │                                      │
+               │  Step 3: Paste & Unlock              │
+               └──────────────────────────────────────┘
+                              │
+                              ▼
+                    handleLinkToken(token)
+                              │
+                    GitHubAPI.getUser()  ──────► api.github.com/user
+                    ├── success? → continue
+                    └── failure? → show error
+                              │
+                    GitHubAPI.ensureRepository('leetcode-submissions')
+                    ├── 200: repo exists → link it
+                    └── 404: create repo with description
+                              │
+                    chrome.storage.local.set({
+                      github_token,
+                      github_repo_owner,  ← from /user response
+                      github_repo_name,
+                      display_name,
+                    })
+                              │
+                    hideOnboarding() → showDashboard()
+                    LeetCodeAPI.getUserStats()
+                    loadStoredState() → renderAllViews()
+```
+
+---
+
+### 4.5 Message Routing Bus
+
+```
+    ┌──────────────────────────────────────────────────────────────┐
+    │           CHROME RUNTIME MESSAGE ROUTING BUS                 │
+    └──────────────────────────────────────────────────────────────┘
+
+    SENDER             MESSAGE TYPE                 HANDLER
+    ─────────          ────────────────────────     ──────────────────────────
+
+    content.js    ──►  SYNC_SUBMISSION           ──► background.js
+                       PROBLEM_SOLVED                 startAsyncGitHubSync()
+                                                      + broadcastSolve()
+
+    content.js    ──►  GET_USER_SESSION          ──► background.js
+                                                      getLeetCodeSession()
+
+    content.js    ──►  GET_USER_STATS            ──► background.js
+                                                      LeetCodeAPI.getUserStats()
+
+    popup/app.js  ──►  BACKFILL_SOLUTIONS        ──► background.js
+                                                      Backfill all submissions
+
+    popup/app.js  ──►  SEND_DUEL_CHALLENGE       ──► background.js
+                                                      FirebaseSquads.createDuel()
+                                                      + sendDesktopNotification()
+
+    popup/app.js  ──►  CHECK_DUEL_STATUS         ──► background.js
+                                                      FirebaseSquads.checkDuelStatus()
+
+    popup/app.js  ──►  GET_DUEL_HISTORY          ──► background.js
+                                                      Firestore query
+
+    background.js ──►  SHOW_INPAGE_NOTIFICATION  ──► content.js (active tabs)
+                                                      showVictoryToast()
+                                                      showInPageAlert()
+
+    background.js ──►  DUEL_STARTED              ──► content.js
+                                                      launchConfetti()
+                                                      showInPageAlert()
+```
+
+---
+
+## 5. Subsystem Specifications
+
+### 5.1 Onboarding Gateway & Auth Gatekeeper
+
+| Property | Detail |
+|:---|:---|
+| **Source Files** | `popup/index.html` (`#onboarding-container`), `popup/app.js` |
+| **Entry Point** | `checkAuthAndInitialize()` on every popup open |
+| **Auth Method** | GitHub Personal Access Token (PAT) with `repo` scope |
+| **Storage Keys** | `github_token`, `github_repo_owner`, `github_repo_name` |
+| **Token URL** | `https://github.com/settings/tokens/new?scopes=repo` |
+| **Repo Default** | `leetcode-submissions` (auto-created if missing) |
+| **Failure Mode** | Shows inline error badge; clears invalid token |
+
+---
+
+### 5.2 Continuous Stats Dashboard
+
+| Property | Detail |
+|:---|:---|
+| **Tab ID** | `#view-dashboard` |
+| **Daily Momentum** | Consecutive day streak, 7-day visual strip (Mon–Sun), XP counter |
+| **Donut Chart** | Pure SVG multi-segment chart: Easy (Emerald #16A34A), Medium (Amber #D97706), Hard (Rose #E11D48) |
+| **DSA Focus Coach** | Analyzes `userSolvedSlugs` against roadmap → identifies weakest 2 categories |
+| **Daily Problem** | Queries `LeetCodeAPI.getDailyChallenge()` on every popup open |
+| **GitHub Sync** | Backfill button with real-time progress bar streamed from `chrome.storage.local.sync_status` |
+| **Activity Strip** | 7-day checkbox grid persisted in `chrome.storage.local` |
+
+---
+
+### 5.3 DSA Roadmaps
+
+| Property | Detail |
+|:---|:---|
+| **Tab ID** | `#view-roadmap` |
+| **Datasets** | `blind75.json` (75 probs) + `neetcode150.json` (150 probs) |
+| **Schema per Problem** | `{ id, title, slug, difficulty, category }` |
+| **Category Filter Pills** | Dynamic `Set` of unique categories from active dataset |
+| **Next For You** | `b75Data.find(p => !solvedSet.has(p.slug))` — first unsolved in order |
+| **Problem Drawer** | Slide-over sheet with approach notes textarea + spaced review buttons |
+| **Review Intervals** | +3d, +7d, +14d, +30d — stored in `chrome.storage.local.review_schedule` |
+| **Completion Tracking** | Cross-references `user_solved_slugs` against roadmap slugs |
+
+---
+
+### 5.4 Multiplayer Squad Rooms
+
+| Property | Detail |
+|:---|:---|
+| **Tab ID** | `#view-squad` |
+| **Room Code Format** | 6 uppercase alphanumeric chars; excludes `0`, `O`, `1`, `I` |
+| **Firestore Collection** | `squads/{roomCode}` |
+| **Poll Interval** | 60 seconds via `chrome.alarms` (`squad_presence_poll`) |
+| **Leadership** | `squad.owner` username; displays `👑 Leader` badge |
+| **Edit Mode** | Toggle reveals `✕ Remove` kick buttons; only leader sees these |
+| **Leave & Transfer** | `leaveSquad()` → transfers ownership to first remaining member if leader |
+| **Challenge Pool** | 25 curated challenges; `getRandomChallenge(excludeId)` prevents immediate repeats |
+| **Challenge Match** | `isSolveMatchingChallenge()` checks `category`, `difficulty`, and `listType` fields |
+| **XP Awards** | Squad challenge complete: +100 XP to all members; Duel win: +50 XP |
+| **Activity Feed** | Max 30 items in Firestore; `clearActivityFeed()` resets to `[]` |
+
+---
+
+### 5.5 1v1 Problem Duels
+
+| Property | Detail |
+|:---|:---|
+| **Tab ID** | `#view-duels` |
+| **Firestore Collection** | `duels/{duelId}` where `duelId = duel_${Date.now()}_${randomStr}` |
+| **Formats** | Random Blind 75, NeetCode 150, Daily Challenge, Speed Sprint (Easy), Boss Fight (Hard) |
+| **Concealment** | Problem hidden until both parties accept (`revealed: false`) |
+| **Incoming Queue** | `#incoming-duels-container` renders all pending invites simultaneously |
+| **Poll Mechanism** | `checkDuelStatus()` scans squad `activityFeed` for `duel_challenge` type events |
+| **Win Resolution** | First to have LeetCode return "Accepted" → `submitDuelSolve()` claims win |
+| **State Recovery** | 0ms load from `chrome.storage.local.active_duel` cache on popup open |
+| **Cleanup** | Accept removes pending invite card from UI + Firestore feed; decline/complete clears storage |
+
+---
+
+### 5.6 GitHub Sync Engine
+
+| Property | Detail |
+|:---|:---|
+| **Trigger** | Content script `SYNC_SUBMISSION` message OR manual backfill button |
+| **Directory Structure** | `{Difficulty}/{id}-{slug}/README.md` + `solution.{ext}` |
+| **ID Format** | 4-digit zero-padded (`0001-two-sum`, `0042-trapping-rain-water`) |
+| **Commit API** | Git Trees API (atomic multi-file, avoids sequential PUT race conditions) |
+| **Commit Message** | `Time: 35ms (98.4%) | Memory: 16.4MB (82.1%) - LeetX Squads` |
+| **Retry Logic** | 3 attempts, 400ms × attempt exponential backoff |
+| **SHA Cache-Bust** | `?_cb=${Date.now()}` on all GET ref requests |
+| **Backfill** | Runs in background; popup closure safe; progress in `sync_status` key |
+| **README Catalog** | Sorted by problem ID table with difficulty badges and solution language links |
+
+---
+
+## 6. API Reference
+
+### `GitHubAPI` (scripts/github.js)
+
+```javascript
+class GitHubAPI {
+  constructor(token: string)
+
+  // Core HTTP
+  async request(endpoint: string, options?: RequestInit): Promise<any>
+
+  // User
+  async getUser(): Promise<{ login, id, avatar_url }>
+
+  // Repository
+  async ensureRepository(repoName: string): Promise<{ repo, isNew, owner, name }>
+  async getFile(owner, repo, path, ref?): Promise<{ sha, content } | null>
+
+  // Git Trees Commit Engine
+  async commitProblemSolution(owner, repo, {
+    frontendId: number,
+    title: string,
+    titleSlug: string,
+    difficulty: string,
+    content: string,         // problem HTML
+    code: string,            // user's solution
+    language: string,
+    runtimeDisplay: string,
+    runtimePercentile: number,
+    memoryDisplay: string,
+    memoryPercentile: number,
+    submittedAt: number,     // Unix timestamp for backdating
+    branch?: string,
+  }): Promise<{ commitSha, folderName, commitMessage }>
+
+  // README Catalog
+  async updateCatalogReadme(owner, repo, branch?): Promise<void>
+  async getExistingProblemSlugs(owner, repo, branch?): Promise<string[]>
+
+  // Static helpers
+  static buildProblemReadme(title, titleSlug, difficulty, content): string
+  static formatCommitMessage(runtime, rtPct, memory, memPct): string
+}
+```
+
+---
+
+### `LeetCodeAPI` (scripts/leetcode.js)
+
+```javascript
+class LeetCodeAPI {
+  // GraphQL core
+  static async query(query: string, variables: object): Promise<any>
+
+  // User data
+  static async getCurrentUser(): Promise<string | null>   // username
+  static async getUserStats(username: string): Promise<{
+    totalSolved, easySolved, mediumSolved, hardSolved,
+    submissionCalendar: Record<string, number>
+  }>
+
+  // Problem data
+  static async getDailyChallenge(): Promise<{
+    id, title, titleSlug, difficulty, url, topics
+  }>
+  static async getQuestionDetails(titleSlug: string): Promise<{
+    questionId, title, difficulty, content, topicTags
+  }>
+
+  // Submission history
+  static async fetchAllAcceptedSubmissions(
+    onProgress?: (pct: number) => void,
+    username?: string
+  ): Promise<Submission[]>
+  static async getSubmissionDetails(submissionId: string): Promise<{
+    code, runtime, memory, runtimePercentile, memoryPercentile,
+    lang, timestamp, questionTitle, titleSlug
+  }>
+}
+```
+
+---
+
+### `FirebaseSquads` (scripts/firebase.js)
+
+```javascript
+class FirebaseSquads {
+  // Firestore REST primitives
+  static async getDocument(collection, docId): Promise<object | null>
+  static async setDocument(collection, docId, data): Promise<void>
+  static async deleteDocument(collection, docId): Promise<void>
+
+  // Squad room management
+  static cleanCode(code: string): string           // '#k9x2p4' → 'K9X2P4'
+  static generateRandomCode(length?: number): string
+  static async generateUniqueRoomCode(): Promise<string>  // '#K9X2P4'
+
+  static async fetchRemoteSquad(code: string): Promise<SquadDoc | null>
+  static async saveRemoteSquad(code: string, data: SquadDoc): Promise<void>
+
+  static async joinOrCreateSquad(roomCode, userProfile): Promise<SquadDoc>
+  static async leaveSquad(roomCode, username): Promise<void>
+  static async kickMember(roomCode, target, actor): Promise<void>
+  static async sendNudge(roomCode, target, from): Promise<boolean>
+
+  // Challenge engine
+  static getRandomChallenge(excludeId?: string): Challenge
+  static isSolveMatchingChallenge(challenge, problemData): boolean
+  static async broadcastSolve(roomCode, username, problemData, streak): Promise<SquadDoc>
+  static async rerollSquadChallenge(roomCode, username): Promise<Challenge>
+  static async clearActivityFeed(roomCode): Promise<void>
+
+  // Duel lifecycle
+  static async createDuel({ roomCode, challenger, opponent, format, problem }): Promise<DuelDoc>
+  static async acceptDuel(duelId, username): Promise<DuelDoc>
+  static async declineDuel(duelId, username): Promise<void>
+  static async forfeitDuel(duelId, username): Promise<void>
+  static async submitDuelSolve(duelId, username, runtimeData): Promise<DuelDoc>
+  static async checkDuelStatus(username, roomCode): Promise<{
+    activeDuel: DuelDoc | null,
+    incomingChallenges: DuelDoc[]
+  }>
+}
+```
+
+---
+
+## 7. State Management Schema
+
+All runtime state lives in `chrome.storage.local` — the single source of truth for the popup and background service worker.
+
+| Key | Type | Default | Purpose |
+|:---|:---|:---|:---|
+| `github_token` | `string` | `null` | GitHub PAT for API authentication |
+| `github_repo_owner` | `string` | `null` | GitHub username (also used as multiplayer display name) |
+| `github_repo_name` | `string` | `'leetcode-submissions'` | Target backup repository |
+| `display_name` | `string` | `null` | Squad profile display name override |
+| `leetcode_username` | `string` | `null` | LeetCode handle for live stats |
+| `streak_count` | `number` | `0` | Consecutive daily solve streak |
+| `user_xp` | `number` | `0` | Total gamification XP points |
+| `today_solved` | `number` | `0` | Problems solved today (resets at midnight) |
+| `last_solved_date` | `string` | `null` | `YYYY-MM-DD` of last accepted submission |
+| `user_solved_slugs` | `string[]` | `[]` | Unique problem slugs solved by user |
+| `solved_easy_count` | `number` | `0` | Total Easy submissions accepted |
+| `solved_med_count` | `number` | `0` | Total Medium submissions accepted |
+| `solved_hard_count` | `number` | `0` | Total Hard submissions accepted |
+| `total_solved` | `number` | `0` | Total accepted submissions |
+| `my_squad_code` | `string` | `''` | Active squad room code (empty = no squad) |
+| `active_duel` | `object` | `null` | Cached active/pending duel for 0ms UI load |
+| `incoming_duel` | `object` | `null` | Cached incoming duel invitation |
+| `sync_status` | `object` | `{ state: 'idle' }` | Background sync progress state |
+| `target_open_tab` | `string` | `null` | Notification click routing target |
+| `theme_preference` | `string` | `'light'` | `'light'` or `'dark'` |
+| `notifications_enabled` | `boolean` | `true` | Master OS notification toggle |
+| `notify_squad_solves_enabled` | `boolean` | `true` | Squad mate solve alerts |
+| `share_solves_enabled` | `boolean` | `true` | Broadcast own solves to squad |
+| `review_schedule` | `object` | `{}` | `{ slug: { id, title, dueDate } }` |
+| `duel_wins` | `number` | `0` | Career duel victories |
+| `duel_matches` | `number` | `0` | Total career duel matches played |
+| `seven_day_activity` | `object` | `{}` | `{ YYYY-MM-DD: boolean }` for 7-day strip |
+
+---
+
+## 8. Firestore Data Model
+
+### `squads/{roomCode}` Document
+
+```json
+{
+  "owner": "AliceGH",
+  "members": [
+    {
+      "username": "AliceGH",
+      "streak": 12,
+      "todaySolved": 2,
+      "totalSolved": 183,
+      "xp": 1450,
+      "lastSeen": 1724430000000
+    },
+    {
+      "username": "BobDev",
+      "streak": 3,
+      "todaySolved": 0,
+      "totalSolved": 67,
+      "xp": 300,
+      "lastSeen": 1724425000000
+    }
+  ],
+  "challenge": {
+    "id": "ch_trees_5",
+    "name": "Solve 5 Tree Problems",
+    "description": "Complete any 5 tree-based problems from LeetCode",
+    "category": "Trees",
+    "target": 5,
+    "progress": 3,
+    "xpReward": 150
+  },
+  "activityFeed": [
+    {
+      "id": "act_1724430000000_abc1",
+      "type": "solve",
+      "username": "AliceGH",
+      "text": "@AliceGH solved Binary Tree Level Order Traversal 🎉",
+      "timestamp": 1724430000000
+    },
+    {
+      "id": "act_1724428000000_def2",
+      "type": "nudge",
+      "fromUsername": "AliceGH",
+      "targetUsername": "BobDev",
+      "text": "@AliceGH sent a nudge to @BobDev! 👋",
+      "timestamp": 1724428000000
+    },
+    {
+      "id": "act_1724420000000_ghi3",
+      "type": "duel_challenge",
+      "challenger": "AliceGH",
+      "opponent": "BobDev",
+      "duelId": "duel_1724420000000_xyz",
+      "problem": { "id": 1, "title": "Two Sum", "slug": "two-sum" },
+      "timestamp": 1724420000000
+    }
+  ],
+  "lastActive": 1724430000000
+}
+```
+
+---
+
+### `duels/{duelId}` Document
+
+```json
+{
+  "id": "duel_1724420000000_xyz9",
+  "roomCode": "K9X2P4",
+  "challenger": "AliceGH",
+  "opponent": "BobDev",
+  "format": "random_blind75",
+  "problem": {
+    "id": 102,
+    "title": "Binary Tree Level Order Traversal",
+    "slug": "binary-tree-level-order-traversal",
+    "difficulty": "Medium",
+    "category": "Trees"
+  },
+  "status": "active",
+  "revealed": true,
+  "createdAt": 1724420000000,
+  "startedAt": 1724421000000,
+  "finishedAt": null,
+  "winner": null,
+  "loser": null,
+  "winnerRuntime": null,
+  "winnerMemory": null
+}
+```
+
+**Possible `status` values**: `"pending"` → `"active"` → `"completed"` | `"forfeited"` | `"declined"`
+
+---
+
+## 9. Squad Challenge Pool
+
+The 25 curated squad challenges cycle automatically on completion. The `isSolveMatchingChallenge()` function strictly validates that a given solve satisfies the challenge's conditions.
+
+| # | Challenge Name | Category | Target | XP |
+|:--|:---|:---|:---:|:---:|
+| 1 | Solve 3 Easy Problems | Any Easy | 3 | 100 |
+| 2 | Solve 5 Easy Problems | Any Easy | 5 | 150 |
+| 3 | Solve 3 Medium Problems | Any Medium | 3 | 150 |
+| 4 | Solve 5 Medium Problems | Any Medium | 5 | 200 |
+| 5 | Solve 2 Hard Problems | Any Hard | 2 | 200 |
+| 6 | Solve 3 Hard Problems | Any Hard | 3 | 250 |
+| 7 | Array & Hashing Gauntlet | Arrays & Hashing | 5 | 150 |
+| 8 | Two Pointer Sprint | Two Pointers | 4 | 150 |
+| 9 | Sliding Window Focus | Sliding Window | 4 | 150 |
+| 10 | Stack Challenge | Stack | 4 | 150 |
+| 11 | Binary Search Drill | Binary Search | 4 | 150 |
+| 12 | Tree Traversal Marathon | Trees | 5 | 150 |
+| 13 | Graph Exploration | Graphs | 4 | 200 |
+| 14 | Backtracking Challenge | Backtracking | 3 | 200 |
+| 15 | Heap / Priority Queue | Heap / Priority Queue | 3 | 200 |
+| 16 | Dynamic Programming Intro | 1-D Dynamic Programming | 3 | 200 |
+| 17 | Advanced DP | 2-D Dynamic Programming | 3 | 250 |
+| 18 | Greedy Strategy | Greedy | 4 | 150 |
+| 19 | Blind 75 Sprint | Blind 75 | 5 | 200 |
+| 20 | NeetCode 150 Push | NeetCode 150 | 5 | 200 |
+| 21 | Speed Sprint (Easy Only) | Easy | 5 | 100 |
+| 22 | Boss Fight (Hard Only) | Hard | 2 | 250 |
+| 23 | Daily Challenge Streak | Daily | 3 | 150 |
+| 24 | Linked List Focus | Linked List | 4 | 150 |
+| 25 | Tries & Bit Manipulation | Advanced | 3 | 200 |
+
+---
+
+## 10. Testing & Validation Playbook
+
+### End-to-End Automated Test Suite (31 Tests)
+
 ```powershell
-Set-Location 'X:\Projects\leetsync-squads'
+node tests/e2e_full_suite.js
+```
+
+| Suite | Tests | Covers |
+|:---|:---:|:---|
+| Manifest V3 & Packaging | 4 | MV3 compliance, permissions, host perms, icons |
+| DSA Roadmaps | 4 | Blind 75 count, NC150 count, category filter, recommendation |
+| GitHub Sync | 2 | Folder naming, README catalog footer |
+| Squad Rooms | 8 | Room codes, create, join, nudge, kick, leave, challenge cycle, reroll, clear feed |
+| 1v1 Duel Machine | 6 | Create, status check, accept, solve, decline, forfeit |
+| UI DOM Integrity | 7 | All 5 views, incoming container, button element, no hardcoded creds, CSS rules |
+
+### Feature Verification Suite (39 Tests)
+
+```powershell
 node scratch/feature_verification.js
 ```
 
-### Run Python Unit Tests:
+### Python Unit Tests (6 Tests)
+
 ```powershell
-python -m unittest discover tests
+python -m unittest tests/test_extension.py
 ```
 
-### Validate JavaScript Syntax:
+### JavaScript Syntax Validation
+
 ```powershell
-node --check 'X:\Projects\leetsync-squads\popup\app.js'
-node --check 'X:\Projects\leetsync-squads\scripts\background.js'
-node --check 'X:\Projects\leetsync-squads\scripts\firebase.js'
-node --check 'X:\Projects\leetsync-squads\scripts\github.js'
-node --check 'X:\Projects\leetsync-squads\scripts\leetcode.js'
-node --check 'X:\Projects\leetsync-squads\scripts\content.js'
+node --check popup/app.js
+node --check scripts/background.js
+node --check scripts/firebase.js
+node --check scripts/github.js
+node --check scripts/leetcode.js
+node --check scripts/content.js
 ```
 
-### Purge Firestore Database (Clean Slate Utility):
+### Firestore Database Reset (Development)
+
 ```powershell
 node scratch/clean_firestore.js
 ```
 
-### Package Production Release ZIP with Semver Bumping:
+---
+
+## 11. Release Engineering
+
+### Semver Versioning
+
+The version string lives exclusively in `manifest.json` and is read by `scripts/package.py`.
+
 ```powershell
+# Patch release (1.1.2 → 1.1.3)
 python scripts/package.py patch
+
+# Minor release (1.1.2 → 1.2.0)
+python scripts/package.py minor
+
+# Major release (1.1.2 → 2.0.0)
+python scripts/package.py major
 ```
+
+### Build Artifacts
+
+| File | Target | Notes |
+|:---|:---|:---|
+| `dist/leetx-v{ver}.zip` | Chrome, Edge, Brave, Arc | Standard MV3 package |
+| `dist/leetx-firefox-v{ver}.zip` | Firefox AMO | Includes `background.scripts` fallback field |
+| `~/Downloads/leetx-v{ver}.zip` | Direct install | Auto-copied for quick testing |
+
+### Git Workflow
+
+```bash
+# Run full test suite before committing
+node tests/e2e_full_suite.js
+
+# Stage and commit
+git add .
+git commit -m "feat: <description>"
+
+# Push to origin
+git push origin main
+```
+
+### Chrome Extension Testing (Local)
+1. Navigate to `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked** → select project root (where `manifest.json` lives)
+4. Click 🔄 Reload icon after any code change
+5. Use **Inspect views → background page** to debug service worker logs
 
 ---
 
 <div align="center">
-  <sub>Document maintained for LeetSync Squads • Repository: <a href="https://github.com/NINJA981/leetsync-squads">NINJA981/leetsync-squads</a></sub>
+  <sub>⚡ LeetX Squads Architecture Document · Repository: <a href="https://github.com/NINJA981/leetsync-squads">NINJA981/leetsync-squads</a> · v1.1.2</sub>
 </div>

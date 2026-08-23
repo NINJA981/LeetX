@@ -14,40 +14,6 @@ Automatic GitHub backup with authentic performance metrics, interactive Blind 75
 
 ---
 
-## 🌟 Key Features
-
-### 🐙 1. Instant Atomic GitHub Sync
-- Automatically commits every accepted LeetCode submission to your GitHub repository in real time.
-- Generates clean, difficulty-categorized directories (`0001-Two-Sum/`, `Easy/`, `Medium/`, `Hard/`).
-- Includes authentic runtime/memory benchmarks and community percentile rankings (e.g. `Beats 98.4%`).
-- Automatically updates a beautiful, Markdown problem catalog table in the repository root `README.md`.
-
-### 🔥 2. Daily Momentum & Streak Gamification
-- Tracks consecutive days of problem solving with authentic LeetCode calendar reconciliation.
-- Interactive 7-day visual momentum strip with animated checkmarks.
-- XP progression system rewarding consistency and challenge completions.
-
-### 🗺️ 3. Curated DSA Roadmaps (Blind 75 & NeetCode 150)
-- Practice the canonical **Blind 75** (75 problems) and **NeetCode 150** (150 problems) curricula.
-- Category filters: Arrays & Hashing, Two Pointers, Sliding Window, Trees, Graphs, Dynamic Programming, and more.
-- Deterministic **"Next For You"** recommendation engine directs you to your next unsolved milestone.
-- Personal problem approach notes & spaced repetition review reminders (+3d, +7d, +14d, +30d).
-
-### 👥 4. Real-Time Multiplayer Squad Rooms
-- Join or host private squad rooms with collision-free 6-character room codes (e.g. `#K9X2P4`).
-- Live squad leaderboard tracking friend streaks, daily solves, and XP.
-- **Squad Leader Controls**: The room creator has authority to manage members (`🚫 Kick`).
-- **25 Dynamic Squad Challenges**: Team-based goals (e.g., *"Solve 5 Tree problems"*) that auto-cycle upon completion.
-- **`👋 Nudge`**: Send real-time wake-up nudges to teammates to preserve squad streaks.
-
-### ⚔️ 5. 1v1 Live Problem Duels
-- Challenge squad mates to live coding speed races.
-- **Format Selectors**: Random Blind 75, NeetCode 150, Today's Daily Challenge, Speed Sprint (Easy), or Boss Fight (Hard).
-- **Concealed Problem Protocol**: The problem title and link remain locked (`🔒 Problem Hidden`) until **both** players accept, ensuring zero head starts.
-- **Instant Win Resolution**: The first player whose submission is accepted by LeetCode is declared the winner with +50 XP and recorded match history.
-
----
-
 ## 💻 Step-by-Step Setup Guide on Your Laptop
 
 Follow these simple instructions to install and configure **LeetX Squads** on your laptop in under 2 minutes.
@@ -98,6 +64,40 @@ cd leetsync-squads
 4. Click the copy icon 📋 next to your new Personal Access Token (`ghp_...`).
 5. Return to the extension popup, paste your token into the field, and click **Unlock ⚡**.
 6. **LeetX Squads** will automatically verify your account, detect your username, and create a `leetcode-submissions` repository in your GitHub account!
+
+---
+
+## 🌟 Key Features
+
+### 🐙 1. Instant Atomic GitHub Sync
+- Automatically commits every accepted LeetCode submission to your GitHub repository in real time.
+- Generates clean, difficulty-categorized directories (`0001-Two-Sum/`, `Easy/`, `Medium/`, `Hard/`).
+- Includes authentic runtime/memory benchmarks and community percentile rankings (e.g. `Beats 98.4%`).
+- Automatically updates a beautiful, Markdown problem catalog table in the repository root `README.md`.
+
+### 🔥 2. Daily Momentum & Streak Gamification
+- Tracks consecutive days of problem solving with authentic LeetCode calendar reconciliation.
+- Interactive 7-day visual momentum strip with animated checkmarks.
+- XP progression system rewarding consistency and challenge completions.
+
+### 🗺️ 3. Curated DSA Roadmaps (Blind 75 & NeetCode 150)
+- Practice the canonical **Blind 75** (75 problems) and **NeetCode 150** (150 problems) curricula.
+- Category filters: Arrays & Hashing, Two Pointers, Sliding Window, Trees, Graphs, Dynamic Programming, and more.
+- Deterministic **"Next For You"** recommendation engine directs you to your next unsolved milestone.
+- Personal problem approach notes & spaced repetition review reminders (+3d, +7d, +14d, +30d).
+
+### 👥 4. Real-Time Multiplayer Squad Rooms
+- Join or host private squad rooms with collision-free 6-character room codes (e.g. `#K9X2P4`).
+- Live squad leaderboard tracking friend streaks, daily solves, and XP.
+- **Squad Leader Controls**: The room creator has authority to manage members (`🚫 Kick`).
+- **25 Dynamic Squad Challenges**: Team-based goals (e.g., *"Solve 5 Tree problems"*) that auto-cycle upon completion.
+- **`👋 Nudge`**: Send real-time wake-up nudges to teammates to preserve squad streaks.
+
+### ⚔️ 5. 1v1 Live Problem Duels
+- Challenge squad mates to live coding speed races.
+- **Format Selectors**: Random Blind 75, NeetCode 150, Today's Daily Challenge, Speed Sprint (Easy), or Boss Fight (Hard).
+- **Concealed Problem Protocol**: The problem title and link remain locked (`🔒 Problem Hidden`) until **both** players accept, ensuring zero head starts.
+- **Instant Win Resolution**: The first player whose submission is accepted by LeetCode is declared the winner with +50 XP and recorded match history.
 
 ---
 
