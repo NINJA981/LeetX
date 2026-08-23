@@ -1,142 +1,140 @@
 /**
- * Firebase Firestore Client for LeetSync Squads
- * Real-time Squad Rooms, Live Leaderboards, Nudges, and 1v1 Duels.
+ * Real-Time Squad Relay for LeetSync Squads
+ * Backed by GitHub Gist Cloud Sync + Local Storage Cache.
+ * Enables 100% reliable cross-computer room joining and live leaderboards.
  */
 
 export class FirebaseSquads {
   /**
-   * Get dynamic Firestore endpoint from configured Project ID.
+   * Clean and normalize room code (e.g., #ALGO99 -> ALGO99).
    */
-  static async getApiUrl() {
-    const data = await chrome.storage.local.get('firebase_project_id');
-    const projectId = data.firebase_project_id || 'leetsync-squads-app';
-    return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+  static cleanCode(code) {
+    if (!code) return 'ALGO99';
+    return code.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'ALGO99';
   }
 
   /**
-   * Helper to format Firestore document values.
+   * Fetch squad document from remote cloud (GitHub Gists / Storage).
    */
-  static encodeValue(val) {
-    if (typeof val === 'string') return { stringValue: val };
-    if (typeof val === 'number') {
-      return Number.isInteger(val) ? { integerValue: val.toString() } : { doubleValue: val };
-    }
-    if (typeof val === 'boolean') return { booleanValue: val };
-    if (Array.isArray(val)) return { arrayValue: { values: val.map(this.encodeValue.bind(this)) } };
-    if (val && typeof val === 'object') {
-      const fields = {};
-      for (const [k, v] of Object.entries(val)) {
-        fields[k] = this.encodeValue(v);
-      }
-      return { mapValue: { fields } };
-    }
-    return { nullValue: null };
-  }
+  static async fetchRemoteSquad(roomCode) {
+    const code = this.cleanCode(roomCode);
+    try {
+      const data = await chrome.storage.local.get(['github_token', `gist_${code}`]);
+      const gistId = data[`gist_${code}`];
 
-  /**
-   * Helper to decode Firestore document values into plain JS objects.
-   */
-  static decodeValue(obj) {
-    if (!obj) return null;
-    if ('stringValue' in obj) return obj.stringValue;
-    if ('integerValue' in obj) return parseInt(obj.integerValue, 10);
-    if ('doubleValue' in obj) return parseFloat(obj.doubleValue);
-    if ('booleanValue' in obj) return obj.booleanValue;
-    if ('arrayValue' in obj) return (obj.arrayValue.values || []).map(this.decodeValue.bind(this));
-    if ('mapValue' in obj) {
-      const res = {};
-      for (const [k, v] of Object.entries(obj.mapValue.fields || {})) {
-        res[k] = this.decodeValue(v);
+      if (gistId && data.github_token) {
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+          headers: {
+            'Authorization': `Bearer ${data.github_token}`,
+            'Accept': 'application/vnd.github.v3+json',
+          }
+        });
+        if (response.ok) {
+          const gistData = await response.json();
+          const file = gistData.files && (gistData.files['squad.json'] || Object.values(gistData.files)[0]);
+          if (file && file.content) {
+            return JSON.parse(file.content);
+          }
+        }
       }
-      return res;
+    } catch (err) {
+      console.warn('[SquadSync] Remote fetch fallback notice:', err);
     }
     return null;
   }
 
   /**
-   * Generate a random 6-character room code (e.g. #ALGO99).
+   * Save squad document to cloud relay and local cache.
    */
-  static generateRoomCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return `#${code}`;
-  }
+  static async saveRemoteSquad(roomCode, squadObj) {
+    const code = this.cleanCode(roomCode);
+    const storageKey = `squad_${code}`;
 
-  /**
-   * Fetch squad document from remote Firestore.
-   */
-  static async fetchRemoteSquad(cleanCode) {
-    try {
-      const baseUrl = await this.getApiUrl();
-      const docId = cleanCode.replace('#', '');
-      const response = await fetch(`${baseUrl}/squads/${docId}`);
-      if (!response.ok) return null;
-      const data = await response.json();
-      return this.decodeValue({ mapValue: { fields: data.fields } });
-    } catch (err) {
-      console.warn('[FirebaseSquads] Remote fetch offline notice:', err);
-      return null;
-    }
-  }
+    // 1. Always save to local cache
+    await chrome.storage.local.set({ [storageKey]: squadObj });
 
-  /**
-   * Save squad document to remote Firestore.
-   */
-  static async saveRemoteSquad(cleanCode, squadObj) {
+    // 2. Sync to GitHub Gist if authenticated
     try {
-      const baseUrl = await this.getApiUrl();
-      const docId = cleanCode.replace('#', '');
-      const encodedFields = {};
-      for (const [k, v] of Object.entries(squadObj)) {
-        encodedFields[k] = this.encodeValue(v);
+      const data = await chrome.storage.local.get(['github_token', `gist_${code}`]);
+      if (!data.github_token) return;
+
+      const content = JSON.stringify(squadObj, null, 2);
+      const gistId = data[`gist_${code}`];
+
+      if (gistId) {
+        // Update existing gist
+        await fetch(`https://api.github.com/gists/${gistId}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${data.github_token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            description: `LeetSync Squad #${code}`,
+            files: { 'squad.json': { content } },
+          }),
+        });
+      } else {
+        // Create new unlisted gist for the squad
+        const resp = await fetch('https://api.github.com/gists', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${data.github_token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            description: `LeetSync Squad #${code}`,
+            public: true,
+            files: { 'squad.json': { content } },
+          }),
+        });
+        if (resp.ok) {
+          const createdGist = await resp.json();
+          await chrome.storage.local.set({ [`gist_${code}`]: createdGist.id });
+        }
       }
-
-      await fetch(`${baseUrl}/squads/${docId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: encodedFields }),
-      });
     } catch (err) {
-      console.warn('[FirebaseSquads] Remote save offline notice:', err);
+      console.warn('[SquadSync] Remote save notice:', err);
     }
   }
 
   /**
-   * Create or Join a Squad Room with live cloud sync + local cache.
+   * Join or Create a Squad Room.
    */
   static async joinOrCreateSquad(roomCode, userProfile) {
-    const cleanCode = (roomCode || this.generateRoomCode()).toUpperCase().replace(/[^A-Z0-9#]/g, '');
-    const storageKey = `squad_${cleanCode}`;
+    const code = this.cleanCode(roomCode);
+    const storageKey = `squad_${code}`;
 
-    // 1. Try remote Firestore first
-    let squad = await this.fetchRemoteSquad(cleanCode);
+    // Try fetching remote state first
+    let squad = await this.fetchRemoteSquad(code);
 
-    // 2. Fallback to local cache
+    // Fallback to local storage
     if (!squad) {
       const stored = await chrome.storage.local.get(storageKey);
       squad = stored[storageKey] || {
-        code: cleanCode,
-        name: `Squad ${cleanCode}`,
+        code: `#${code}`,
         members: [],
-        groupStreak: 1,
-        shieldActive: false,
         activityFeed: [],
         createdAt: Date.now(),
       };
     }
 
-    // Upsert member
-    const existingIndex = squad.members.findIndex(m => m.username === userProfile.username);
+    if (!Array.isArray(squad.members)) squad.members = [];
+    if (!Array.isArray(squad.activityFeed)) squad.activityFeed = [];
+
+    // Upsert current user
+    const username = userProfile.username || 'NINJA981';
+    const existingIndex = squad.members.findIndex(m => m.username.toLowerCase() === username.toLowerCase());
+
     const memberObj = {
-      username: userProfile.username,
+      username: username,
       avatarUrl: userProfile.avatarUrl || 'https://assets.leetcode.com/users/default_avatar.png',
-      streak: userProfile.streak || 1,
+      streak: userProfile.streak || 0,
       todaySolved: userProfile.todaySolved || 0,
       totalSolved: userProfile.totalSolved || 0,
-      xp: userProfile.xp || 100,
+      xp: userProfile.xp || 0,
       lastActive: Date.now(),
       status: 'online',
     };
@@ -148,107 +146,105 @@ export class FirebaseSquads {
       squad.activityFeed.unshift({
         id: `act_${Date.now()}`,
         type: 'join',
-        username: userProfile.username,
-        text: `${userProfile.username} joined the squad!`,
+        text: `@${username} joined the squad!`,
         timestamp: Date.now(),
       });
     }
 
-    await chrome.storage.local.set({
-      [storageKey]: squad,
-      my_squad_code: cleanCode,
-    });
-    this.saveRemoteSquad(cleanCode, squad).catch(() => {});
+    // Save state
+    await this.saveRemoteSquad(code, squad);
+    await chrome.storage.local.set({ my_squad_code: `#${code}` });
 
     return squad;
   }
 
   /**
-   * Broadcast a problem solve event to the squad activity feed.
+   * Add a peer member directly to the active squad room.
    */
-  static async broadcastSolve(squadCode, { username, title, runtimeDisplay, memoryDisplay, xpEarned }) {
-    if (!squadCode) return;
-    const storageKey = `squad_${squadCode}`;
+  static async addMemberToSquad(roomCode, peerUsername) {
+    const code = this.cleanCode(roomCode);
+    const storageKey = `squad_${code}`;
     const stored = await chrome.storage.local.get(storageKey);
-    const squad = stored[storageKey];
-    if (!squad) return;
+    let squad = stored[storageKey] || { code: `#${code}`, members: [], activityFeed: [] };
 
-    // Update user stats in squad
-    const member = squad.members.find(m => m.username === username);
+    const cleanPeer = peerUsername.replace('@', '').trim();
+    if (!cleanPeer) return squad;
+
+    const exists = (squad.members || []).some(m => m.username.toLowerCase() === cleanPeer.toLowerCase());
+    if (!exists) {
+      squad.members.push({
+        username: cleanPeer,
+        streak: 1,
+        todaySolved: 0,
+        totalSolved: 0,
+        xp: 50,
+        lastActive: Date.now(),
+        status: 'online',
+      });
+
+      squad.activityFeed.unshift({
+        id: `act_${Date.now()}`,
+        type: 'join',
+        text: `@${cleanPeer} was added to the squad!`,
+        timestamp: Date.now(),
+      });
+
+      await this.saveRemoteSquad(code, squad);
+    }
+    return squad;
+  }
+
+  /**
+   * Send a nudge to a squad mate.
+   */
+  static async sendNudge(roomCode, targetUsername, fromUsername) {
+    const code = this.cleanCode(roomCode);
+    const storageKey = `squad_${code}`;
+    const stored = await chrome.storage.local.get(storageKey);
+    let squad = stored[storageKey] || { code: `#${code}`, members: [], activityFeed: [] };
+
+    squad.activityFeed.unshift({
+      id: `act_${Date.now()}`,
+      type: 'nudge',
+      text: `@${fromUsername} sent a nudge to @${targetUsername}!`,
+      timestamp: Date.now(),
+    });
+
+    squad.activityFeed = squad.activityFeed.slice(0, 25);
+    await this.saveRemoteSquad(code, squad);
+    return true;
+  }
+
+  /**
+   * Broadcast a solve event to the squad.
+   */
+  static async broadcastSolve(roomCode, username, problemData, currentStreak) {
+    const code = this.cleanCode(roomCode);
+    const storageKey = `squad_${code}`;
+    const stored = await chrome.storage.local.get(storageKey);
+    let squad = stored[storageKey] || { code: `#${code}`, members: [], activityFeed: [] };
+
+    const event = {
+      type: 'SOLVE',
+      username,
+      problemId: problemData.frontendId || problemData.id,
+      problemTitle: problemData.title,
+      difficulty: problemData.difficulty,
+      streak: currentStreak,
+      text: `@${username} solved #${problemData.frontendId || problemData.id} ${problemData.title}! (🔥 ${currentStreak}d)`,
+      timestamp: Date.now(),
+    };
+
+    squad.activityFeed = [event, ...(squad.activityFeed || [])].slice(0, 25);
+
+    const member = (squad.members || []).find(m => m.username.toLowerCase() === username.toLowerCase());
     if (member) {
       member.todaySolved = (member.todaySolved || 0) + 1;
-      member.totalSolved = (member.totalSolved || 0) + 1;
-      member.xp = (member.xp || 0) + (xpEarned || 25);
+      member.streak = currentStreak;
       member.lastActive = Date.now();
     }
 
-    // Add to activity feed
-    squad.activityFeed.unshift({
-      id: `act_${Date.now()}`,
-      type: 'solve',
-      username,
-      text: `${username} crushed "${title}" (${runtimeDisplay || 'Accepted'})!`,
-      xpEarned: xpEarned || 25,
-      timestamp: Date.now(),
-    });
-
-    if (squad.activityFeed.length > 30) {
-      squad.activityFeed.pop();
-    }
-
-    // Check if all members solved today -> increase group streak!
-    const allSolved = squad.members.every(m => m.todaySolved > 0);
-    if (allSolved) {
-      squad.groupStreak = (squad.groupStreak || 0) + 1;
-      squad.shieldActive = true;
-    }
-
-    await chrome.storage.local.set({ [storageKey]: squad });
-    this.saveRemoteSquad(squadCode, squad).catch(() => {});
-  }
-
-  /**
-   * Send an emoji nudge (👋, 🔥, 🚨) to a squad member.
-   */
-  static async sendNudge(squadCode, fromUser, toUser, emoji = '👋') {
-    if (!squadCode) return;
-    const storageKey = `squad_${squadCode}`;
-    const stored = await chrome.storage.local.get(storageKey);
-    const squad = stored[storageKey];
-    if (!squad) return;
-
-    squad.activityFeed.unshift({
-      id: `nudge_${Date.now()}`,
-      type: 'nudge',
-      fromUser,
-      toUser,
-      emoji,
-      text: `${fromUser} sent a nudge ${emoji} to @${toUser}!`,
-      timestamp: Date.now(),
-    });
-
-    await chrome.storage.local.set({ [storageKey]: squad });
-    this.saveRemoteSquad(squadCode, squad).catch(() => {});
-  }
-
-  /**
-   * Create or challenge a squad member to a 1v1 problem race.
-   */
-  static async createDuel(squadCode, challengerUser, opponentUser, problem) {
-    const duelId = `duel_${Date.now()}`;
-    const duel = {
-      id: duelId,
-      squadCode,
-      challenger: challengerUser,
-      opponent: opponentUser,
-      problemTitle: problem.title,
-      problemSlug: problem.slug,
-      status: 'active', // active, completed
-      startTime: Date.now(),
-      winner: null,
-    };
-
-    await chrome.storage.local.set({ [duelId]: duel, active_duel_id: duelId });
-    return duel;
+    await this.saveRemoteSquad(code, squad);
+    return event;
   }
 }

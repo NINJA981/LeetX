@@ -233,11 +233,17 @@
             <span class="squad-code-badge" id="squad-room-code">#ALGO99</span>
           </div>
           <div class="squad-join-controls">
-            <input type="text" id="input-join-code" placeholder="Join #CODE" class="input-flat" style="width: 90px;">
+            <input type="text" id="input-join-code" placeholder="Join #CODE" class="input-flat" style="width: 85px;">
             <button class="btn-secondary-flat" id="btn-join-squad">Join</button>
-            <button class="btn-icon-btn" id="btn-copy-squad" title="Copy code">📋</button>
-            <button class="btn-icon-btn" id="btn-leave-squad" title="New Room">🔄</button>
+            <button class="btn-icon-btn" id="btn-copy-squad" title="Copy room code">📋</button>
+            <button class="btn-icon-btn" id="btn-sync-squad" title="Sync live room">🔄</button>
           </div>
+        </div>
+
+        <!-- Add Friend Directly to Squad -->
+        <div style="display: flex; gap: 6px; margin-bottom: 2px;">
+          <input type="text" id="input-add-member" placeholder="+ Add friend @username..." class="input-flat" style="flex: 1; font-size: 11px;">
+          <button class="btn-secondary-flat" id="btn-add-member" style="font-size: 11px; padding: 4px 10px; font-weight: 600;">+ Add</button>
         </div>
 
         <!-- Weekly Squad Challenge -->
