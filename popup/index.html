@@ -433,15 +433,32 @@
           <div class="backfill-msg" id="auth-status-msg" style="text-align: center; margin-top: 2px;"></div>
         </div>
 
-        <!-- NOTIFICATIONS PREFERENCES -->
+        <!-- NOTIFICATIONS & SQUAD PRIVACY PREFERENCES -->
         <div class="settings-group-card">
-          <span class="section-label">NOTIFICATIONS</span>
+          <span class="section-label">NOTIFICATIONS & SQUAD PRIVACY</span>
+          
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <div>
               <div style="font-size: 12px; font-weight: 600;">Desktop Notifications</div>
-              <div style="font-size: 11px; color: var(--text-muted);">Notify on GitHub sync, duels & streak alerts</div>
+              <div style="font-size: 11px; color: var(--text-muted);">Notify on GitHub sync & streak alerts</div>
             </div>
             <input type="checkbox" id="toggle-notifications" checked style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-dark);">
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+            <div>
+              <div style="font-size: 12px; font-weight: 600;">Notify on Squad Solves</div>
+              <div style="font-size: 11px; color: var(--text-muted);">Get notified when squad mates solve a problem</div>
+            </div>
+            <input type="checkbox" id="toggle-squad-notifications" checked style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-dark);">
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+            <div>
+              <div style="font-size: 12px; font-weight: 600;">Share My Solves with Squad</div>
+              <div style="font-size: 11px; color: var(--text-muted);">Broadcast my accepted solves to the room</div>
+            </div>
+            <input type="checkbox" id="toggle-share-solves" checked style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-dark);">
           </div>
         </div>
 

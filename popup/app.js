@@ -611,18 +611,35 @@ async function handleLinkToken(token) {
  * Setup Event Listeners for buttons and forms.
  */
 function setupEventListeners() {
-  // Notification Toggle Preference
+  // Notification & Squad Privacy Toggle Preferences
   const notifToggle = document.getElementById('toggle-notifications');
-  if (notifToggle) {
-    chrome.storage.local.get(['notifications_enabled']).then(data => {
-      notifToggle.checked = data.notifications_enabled !== false;
-    });
+  const squadNotifToggle = document.getElementById('toggle-squad-notifications');
+  const shareSolvesToggle = document.getElementById('toggle-share-solves');
 
-    notifToggle.addEventListener('change', async (e) => {
-      await chrome.storage.local.set({ notifications_enabled: e.target.checked });
-      showToast(e.target.checked ? 'Desktop notifications enabled 🔔' : 'Desktop notifications muted 🔕');
-    });
-  }
+  chrome.storage.local.get([
+    'notifications_enabled',
+    'notify_squad_solves_enabled',
+    'share_solves_enabled'
+  ]).then(data => {
+    if (notifToggle) notifToggle.checked = data.notifications_enabled !== false;
+    if (squadNotifToggle) squadNotifToggle.checked = data.notify_squad_solves_enabled !== false;
+    if (shareSolvesToggle) shareSolvesToggle.checked = data.share_solves_enabled !== false;
+  });
+
+  notifToggle?.addEventListener('change', async (e) => {
+    await chrome.storage.local.set({ notifications_enabled: e.target.checked });
+    showToast(e.target.checked ? 'Desktop notifications enabled 🔔' : 'Desktop notifications muted 🔕');
+  });
+
+  squadNotifToggle?.addEventListener('change', async (e) => {
+    await chrome.storage.local.set({ notify_squad_solves_enabled: e.target.checked });
+    showToast(e.target.checked ? 'Squad solve alerts enabled 🎉' : 'Squad solve alerts muted 🔕');
+  });
+
+  shareSolvesToggle?.addEventListener('change', async (e) => {
+    await chrome.storage.local.set({ share_solves_enabled: e.target.checked });
+    showToast(e.target.checked ? 'Sharing solves with squad ✓' : 'Solve broadcasting paused');
+  });
   // Theme Mode Switcher
   document.querySelectorAll('[data-set-theme]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
