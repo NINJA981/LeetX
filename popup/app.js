@@ -679,10 +679,8 @@ function setupEventListeners() {
     await checkAuthAndInitialize();
   });
 
-  // Save Settings
-  document.getElementById('btn-settings-sync-now')?.addEventListener('click', () => {
-    document.getElementById('btn-backfill-all')?.click();
-  });
+  // Sync All Solutions (Settings View)
+  document.getElementById('btn-settings-sync-now')?.addEventListener('click', () => performSolutionSync('settings'));
 
   // Segmented Roadmap Switcher Buttons (Blind 75 vs NeetCode 150)
   document.querySelectorAll('.roadmap-segment-btn').forEach(btn => {
@@ -767,21 +765,8 @@ function setupEventListeners() {
     showToast('Streak and XP reset to 0');
   });
 
-  // 1-Click Backfill Button: Syncs full 113+ LeetCode problems & authentic difficulty breakdown
-  document.getElementById('btn-backfill-all')?.addEventListener('click', async () => {
-    const box = document.getElementById('backfill-progress-box');
-    const msg = document.getElementById('backfill-status-msg');
-    const bar = document.getElementById('backfill-bar');
-
-    box.style.display = 'flex';
-    msg.innerText = 'Scanning LeetCode submission history...';
-    bar.style.width = '15%';
-
-    try {
-      const acceptedSubs = await LeetCodeAPI.fetchAllAcceptedSubmissions((count, sub) => {
-        msg.innerText = `Scanning: ${count} problems (${sub.title})...`;
-        bar.style.width = `${Math.min(90, count)}%`;
-      });
+  // Sync All Solutions (Stats View)
+  document.getElementById('btn-backfill-all')?.addEventListener('click', () => performSolutionSync('stats'));
 
       acceptedSubs.forEach(s => {
         userSolvedSlugs.add(s.titleSlug);
