@@ -210,7 +210,14 @@
       <!-- 5. SETTINGS VIEW -->
       <section id="view-settings" class="tab-view">
         <div class="card settings-card">
-          <div class="card-subtitle">GITHUB AUTHENTICATION</div>
+          <div class="card-subtitle">USER & SQUAD PROFILE</div>
+          
+          <div class="form-group">
+            <label class="form-label">Display Handle / Username:</label>
+            <input type="text" id="input-display-name" placeholder="NINJA981" value="NINJA981" class="input-dark">
+          </div>
+
+          <div class="divider-text"><span>GITHUB AUTHENTICATION</span></div>
           
           <!-- 1-Click OAuth Button -->
           <button class="btn-github-oauth" id="btn-github-oauth">
@@ -244,7 +251,7 @@
             <input type="text" id="input-firebase-project" placeholder="leetsync-squads-app" class="input-dark">
           </div>
 
-          <button class="btn-primary" id="btn-save-settings">Save & Connect</button>
+          <button class="btn-primary" id="btn-save-settings">Save Settings</button>
           <div class="auth-status-msg" id="auth-status-msg"></div>
         </div>
       </section>

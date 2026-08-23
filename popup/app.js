@@ -1,6 +1,6 @@
 /**
  * LeetSync Squads - Popup Application Logic & View Router
- * Production-ready: Dynamic Roadmap switching, solved problems auto-detection, and clean peer duels.
+ * Production-ready: Custom Display Name, Dynamic Roadmaps, and Real Live Peer Duels.
  */
 
 import { LeetCodeAPI } from '../scripts/leetcode.js';
@@ -10,7 +10,7 @@ import { FirebaseSquads } from '../scripts/firebase.js';
 let currentRoadmapData = [];
 let currentRoadmapType = 'blind75';
 let userSolvedSlugs = new Set();
-let currentUsername = null;
+let currentUsername = 'NINJA981';
 
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', async () => {
@@ -47,6 +47,7 @@ function setupTabs() {
  */
 async function loadStoredState() {
   const data = await chrome.storage.local.get([
+    'display_name',
     'github_token',
     'github_repo_owner',
     'github_repo_name',
@@ -62,7 +63,10 @@ async function loadStoredState() {
     'duel_played',
   ]);
 
-  currentUsername = data.leetcode_username || null;
+  // Priority: User's custom display name > GitHub username > LeetCode user > Default NINJA981
+  currentUsername = data.display_name || data.github_repo_owner || 'NINJA981';
+  document.getElementById('input-display-name').value = currentUsername;
+
   if (data.user_solved_slugs && Array.isArray(data.user_solved_slugs)) {
     userSolvedSlugs = new Set(data.user_solved_slugs);
   }
@@ -128,15 +132,11 @@ async function syncLiveLeetCodeProfile() {
   try {
     const userStatus = await LeetCodeAPI.getCurrentUser();
     if (userStatus && userStatus.isSignedIn && userStatus.username) {
-      currentUsername = userStatus.username;
-      await chrome.storage.local.set({ leetcode_username: currentUsername });
-
-      const stats = await LeetCodeAPI.getUserStats(currentUsername);
+      const stats = await LeetCodeAPI.getUserStats(userStatus.username);
       if (stats) {
         // Daily consecutive streak from calendar
         const streak = stats.streak || 0;
         const totalSolved = stats.totalSolved || 0;
-        // XP calculation: 10 per Easy, 25 per Medium, 50 per Hard
         const xp = (stats.easySolved * 10) + (stats.mediumSolved * 25) + (stats.hardSolved * 50);
 
         document.getElementById('header-streak-count').innerText = streak;
@@ -233,19 +233,20 @@ function renderRoadmapList(categoryFilter = 'all') {
 }
 
 /**
- * Render Squad Leaderboard and Activity Stream with strict member deduplication.
+ * Render Squad Leaderboard and Activity Stream with strict member cleanup.
  */
 async function renderSquad(squadCode) {
   const stored = await chrome.storage.local.get([
     `squad_${squadCode}`,
-    'leetcode_username',
+    'display_name',
+    'github_repo_owner',
     'streak_count',
     'today_solved',
     'total_solved',
     'user_xp',
   ]);
 
-  const username = stored.leetcode_username || currentUsername || 'You';
+  const username = stored.display_name || stored.github_repo_owner || currentUsername || 'NINJA981';
   const rawSquad = await FirebaseSquads.joinOrCreateSquad(squadCode, {
     username,
     streak: stored.streak_count || 0,
@@ -254,16 +255,26 @@ async function renderSquad(squadCode) {
     xp: stored.user_xp || 0,
   });
 
-  // Strict deduplication & filter out ghost/test members
+  // Strict deduplication & filter out random/ghost usernames (like AH0CQLRCsa or You)
   const memberMap = new Map();
   (rawSquad.members || []).forEach(m => {
     if (!m.username || m.username === 'undefined' || m.username === 'null') return;
-    // If username is 'You' and we know the real username, skip 'You'
-    if (m.username === 'You' && username !== 'You') return;
-    // If username is temp random string like AH0CQLRCsa and we know real user, skip
-    if (m.username.length === 10 && m.username !== username && username !== 'You') return;
+    if (m.username === 'You') return;
+    // Strip old auto-generated random string if real display name is active
+    if (m.username.startsWith('AH0C') && username !== m.username) return;
 
     memberMap.set(m.username, m);
+  });
+
+  // Always ensure current user is in squad with real username
+  memberMap.set(username, {
+    username,
+    streak: stored.streak_count || 0,
+    todaySolved: stored.today_solved || 0,
+    totalSolved: stored.total_solved || 0,
+    xp: stored.user_xp || 0,
+    lastActive: Date.now(),
+    status: 'online',
   });
 
   const members = Array.from(memberMap.values());
@@ -273,29 +284,25 @@ async function renderSquad(squadCode) {
   const listEl = document.getElementById('squad-members-list');
   listEl.innerHTML = '';
 
-  if (members.length === 0) {
-    listEl.innerHTML = '<div class="activity-empty">No members in squad yet. Share your code to invite friends!</div>';
-  } else {
-    members.forEach((m, idx) => {
-      const row = document.createElement('div');
-      row.className = 'leaderboard-item';
-      const isSolved = (m.todaySolved || 0) > 0;
-      const rankNum = `#${idx + 1}`;
+  members.forEach((m, idx) => {
+    const row = document.createElement('div');
+    row.className = 'leaderboard-item';
+    const isSolved = (m.todaySolved || 0) > 0;
+    const rankNum = `#${idx + 1}`;
 
-      row.innerHTML = `
-        <div class="member-info">
-          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${rankNum}</span>
-          <span class="member-name">@${m.username}</span>
-          <span class="member-streak">🔥 ${m.streak || 0}d</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 11px; font-family: var(--font-mono); color: ${isSolved ? 'var(--color-green-text)' : 'var(--color-amber)'}">${isSolved ? '✓ Done' : '⏳ Pending'}</span>
-          ${!isSolved && m.username !== username ? `<button class="nudge-btn" data-user="${m.username}" title="Send Nudge">👋</button>` : ''}
-        </div>
-      `;
-      listEl.appendChild(row);
-    });
-  }
+    row.innerHTML = `
+      <div class="member-info">
+        <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${rankNum}</span>
+        <span class="member-name">@${m.username}</span>
+        <span class="member-streak">🔥 ${m.streak || 0}d</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 11px; font-family: var(--font-mono); color: ${isSolved ? 'var(--color-green-text)' : 'var(--color-amber)'}">${isSolved ? '✓ Done' : '⏳ Pending'}</span>
+        ${!isSolved && m.username !== username ? `<button class="nudge-btn" data-user="${m.username}" title="Send Nudge">👋</button>` : ''}
+      </div>
+    `;
+    listEl.appendChild(row);
+  });
 
   // Attach Nudge events
   document.querySelectorAll('.nudge-btn').forEach(btn => {
@@ -310,10 +317,10 @@ async function renderSquad(squadCode) {
   // Populate Activity Feed
   const feedEl = document.getElementById('squad-activity-feed');
   feedEl.innerHTML = '';
-  const activities = (rawSquad.activityFeed || []).slice(0, 5);
+  const activities = (rawSquad.activityFeed || []).filter(a => !a.text.includes('AH0C') && !a.text.includes('You')).slice(0, 5);
 
   if (activities.length === 0) {
-    feedEl.innerHTML = '<div class="activity-empty">No recent activity. Solve a problem to light up the feed!</div>';
+    feedEl.innerHTML = `<div class="activity-empty">${username} joined the squad! Solve a problem to light up the feed.</div>`;
   } else {
     activities.forEach(act => {
       const item = document.createElement('div');
@@ -329,7 +336,6 @@ async function renderSquad(squadCode) {
     opponentSelect.innerHTML = '<option value="">Select a squad mate...</option>';
     let peerCount = 0;
     members.forEach(m => {
-      // Never allow challenging yourself or 'You'
       if (m.username !== username && m.username !== 'You') {
         peerCount++;
         const opt = document.createElement('option');
@@ -406,45 +412,44 @@ function setupEventListeners() {
 
   // Save Settings
   document.getElementById('btn-save-settings')?.addEventListener('click', async () => {
+    const displayName = document.getElementById('input-display-name').value.trim() || 'NINJA981';
     const token = document.getElementById('input-github-token').value.trim();
     const repoSelect = document.getElementById('select-github-repo');
     const branch = document.getElementById('input-github-branch').value.trim() || 'main';
     const statusEl = document.getElementById('auth-status-msg');
 
-    if (!token) {
-      statusEl.innerText = 'Please enter a valid GitHub token.';
-      statusEl.style.color = 'var(--color-red)';
-      return;
-    }
+    currentUsername = displayName;
 
-    try {
-      const gh = new GitHubAPI(token);
-      const user = await gh.getUser();
+    let repoOwner = displayName;
+    let repoName = repoSelect.value;
 
-      let repoOwner = user.login;
-      let repoName = repoSelect.value;
-
-      if (!repoName && repoSelect.options.length > 1) {
-        repoName = repoSelect.options[1].value;
+    if (token) {
+      try {
+        const gh = new GitHubAPI(token);
+        const user = await gh.getUser();
+        repoOwner = user.login;
+        if (!repoName && repoSelect.options.length > 1) {
+          repoName = repoSelect.options[1].value;
+        }
+      } catch (err) {
+        console.warn('GitHub validation notice:', err.message);
       }
-
-      const firebaseProject = document.getElementById('input-firebase-project').value.trim() || 'leetsync-squads-app';
-
-      await chrome.storage.local.set({
-        github_token: token,
-        github_repo_owner: repoOwner,
-        github_repo_name: repoName || 'leetcode-submissions',
-        github_branch: branch,
-        firebase_project_id: firebaseProject,
-      });
-
-      statusEl.innerText = `✓ Connected to ${repoOwner}/${repoName || 'leetcode-submissions'}!`;
-      statusEl.style.color = 'var(--color-green-text)';
-      await loadStoredState();
-    } catch (err) {
-      statusEl.innerText = `Connection failed: ${err.message}`;
-      statusEl.style.color = 'var(--color-red)';
     }
+
+    const firebaseProject = document.getElementById('input-firebase-project').value.trim() || 'leetsync-squads-app';
+
+    await chrome.storage.local.set({
+      display_name: displayName,
+      github_token: token,
+      github_repo_owner: repoOwner,
+      github_repo_name: repoName || 'leetcode-submissions',
+      github_branch: branch,
+      firebase_project_id: firebaseProject,
+    });
+
+    statusEl.innerText = `✓ Settings saved! Display name set to @${displayName}`;
+    statusEl.style.color = 'var(--color-green-text)';
+    await loadStoredState();
   });
 
   // Join Squad Button
