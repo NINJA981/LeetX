@@ -1519,3 +1519,142 @@ body {
   color: #FFFFFF;
   font-weight: 600;
 }
+
+/* ==========================================
+   REFINED DARK THEME (Linear / GitHub Slate)
+========================================== */
+[data-theme="dark"],
+body[data-theme="dark"] {
+  --bg-app: #0F172A;
+  --bg-subtle: #1E293B;
+  --bg-muted: #334155;
+  --bg-hover: #334155;
+  --bg-active: #475569;
+
+  --border-main: #334155;
+  --border-subtle: #1E293B;
+  --border-strong: #475569;
+
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+
+  --accent-dark: #F8FAFC;
+  --accent-hover: #E2E8F0;
+  --accent-blue: #38BDF8;
+
+  --color-easy: #4ADE80;
+  --color-easy-bg: rgba(74, 222, 128, 0.15);
+  --color-med: #FBBF24;
+  --color-med-bg: rgba(251, 191, 36, 0.15);
+  --color-hard: #FB7185;
+  --color-hard-bg: rgba(251, 113, 133, 0.15);
+}
+
+[data-theme="dark"] .brand-icon-box {
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+[data-theme="dark"] .brand-icon-box-lg {
+  background: #F8FAFC;
+  color: #0F172A;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .onboarding-screen {
+  background: #0F172A;
+}
+
+[data-theme="dark"] .day-circle {
+  background: #1E293B;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .day-circle.done {
+  background: #16A34A;
+  border-color: #16A34A;
+  color: #FFFFFF;
+}
+
+[data-theme="dark"] .day-circle.today-ring {
+  border-color: #F8FAFC;
+}
+
+[data-theme="dark"] .input-flat,
+[data-theme="dark"] .select-flat,
+[data-theme="dark"] .btn-secondary-flat,
+[data-theme="dark"] .btn-icon-btn,
+[data-theme="dark"] .btn-sync-action,
+[data-theme="dark"] .squad-code-badge {
+  background: #1E293B;
+  border-color: #334155;
+  color: #F8FAFC;
+}
+
+[data-theme="dark"] .btn-secondary-flat:hover,
+[data-theme="dark"] .btn-icon-btn:hover,
+[data-theme="dark"] .btn-sync-action:hover {
+  background: #334155;
+}
+
+[data-theme="dark"] .roadmap-segment-btn.active {
+  background: #1E293B;
+  color: #F8FAFC;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .roadmap-segment-btn.active .seg-badge {
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+[data-theme="dark"] .next-rec-card {
+  background: #1E293B;
+  border-color: #2563EB;
+}
+
+[data-theme="dark"] .next-rec-title {
+  color: #60A5FA;
+}
+
+[data-theme="dark"] .next-rec-sub {
+  color: #93C5FD;
+}
+
+[data-theme="dark"] .review-due-banner {
+  background: #272008;
+  border-color: #854D0E;
+}
+
+[data-theme="dark"] .review-banner-title {
+  color: #FDE047;
+}
+
+[data-theme="dark"] .review-banner-sub {
+  color: #FEF08A;
+}
+
+[data-theme="dark"] .problem-drawer-content {
+  background: #0F172A;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .btn-cta-solve {
+  background: #F8FAFC;
+  color: #0F172A;
+}
+[data-theme="dark"] .btn-cta-solve:hover {
+  background: #E2E8F0;
+}
+
+[data-theme="dark"] .cat-pill-btn.active {
+  background: #F8FAFC;
+  color: #0F172A;
+  border-color: #F8FAFC;
+}
+
+[data-theme="dark"] .step-num-badge {
+  background: #F8FAFC;
+  color: #0F172A;
+}

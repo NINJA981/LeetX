@@ -387,6 +387,21 @@
 
       <!-- 5. SETTINGS VIEW -->
       <section id="view-settings" class="tab-view">
+        <!-- APPEARANCE & THEME SWITCHER -->
+        <div class="settings-group-card">
+          <span class="section-label">APPEARANCE</span>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 12px; font-weight: 600;">Theme Mode</div>
+              <div style="font-size: 11px; color: var(--text-muted);">Choose light or eye-friendly dark mode</div>
+            </div>
+            <div class="roadmap-segmented-wrap" style="padding: 2px; width: 140px;">
+              <button class="roadmap-segment-btn active" id="theme-btn-light" data-set-theme="light" style="padding: 4px 0; font-size: 11px;">☀️ Light</button>
+              <button class="roadmap-segment-btn" id="theme-btn-dark" data-set-theme="dark" style="padding: 4px 0; font-size: 11px;">🌙 Dark</button>
+            </div>
+          </div>
+        </div>
+
         <div class="settings-group-card">
           <span class="section-label">USER PROFILE</span>
           <div class="form-field-group">

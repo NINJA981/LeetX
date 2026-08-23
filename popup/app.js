@@ -34,7 +34,20 @@ function showToast(msg) {
 }
 
 // Initialize on DOM ready
+// Apply saved theme immediately on DOM load
+async function applyStoredTheme() {
+  const data = await chrome.storage.local.get(['theme_preference']);
+  const theme = data.theme_preference || 'light';
+  document.body.setAttribute('data-theme', theme);
+  document.documentElement.setAttribute('data-theme', theme);
+
+  document.querySelectorAll('[data-set-theme]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.setTheme === theme);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+  await applyStoredTheme();
   setupTabs();
   await checkAuthAndInitialize();
   setupEventListeners();
@@ -598,6 +611,21 @@ async function handleLinkToken(token) {
  * Setup Event Listeners for buttons and forms.
  */
 function setupEventListeners() {
+  // Theme Mode Switcher
+  document.querySelectorAll('[data-set-theme]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const theme = e.currentTarget.dataset.setTheme;
+      document.body.setAttribute('data-theme', theme);
+      document.documentElement.setAttribute('data-theme', theme);
+      await chrome.storage.local.set({ theme_preference: theme });
+
+      document.querySelectorAll('[data-set-theme]').forEach(b => {
+        b.classList.toggle('active', b.dataset.setTheme === theme);
+      });
+
+      showToast(`Switched to ${theme === 'dark' ? 'Dark 🌙' : 'Light ☀️'} mode`);
+    });
+  });
   // 1. Authorize on GitHub Button: Opens GitHub token generation with repo scope in a new tab
   document.getElementById('btn-onboard-connect-oauth')?.addEventListener('click', () => {
     const authUrl = 'https://github.com/settings/tokens/new?description=LeetSync+Squads&scopes=repo';
