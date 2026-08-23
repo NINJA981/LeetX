@@ -768,46 +768,6 @@ function setupEventListeners() {
   // Sync All Solutions (Stats View)
   document.getElementById('btn-backfill-all')?.addEventListener('click', () => performSolutionSync('stats'));
 
-      acceptedSubs.forEach(s => {
-        userSolvedSlugs.add(s.titleSlug);
-      });
-
-      let easyCount = 0;
-      let medCount = 0;
-      let hardCount = 0;
-      let totalCount = acceptedSubs.length;
-
-      const userStatus = await LeetCodeAPI.getCurrentUser();
-      if (userStatus && userStatus.username) {
-        const stats = await LeetCodeAPI.getUserStats(userStatus.username);
-        if (stats) {
-          easyCount = stats.easySolved || 0;
-          medCount = stats.mediumSolved || 0;
-          hardCount = stats.hardSolved || 0;
-          totalCount = stats.totalSolved || totalCount;
-        }
-      }
-
-      await chrome.storage.local.set({
-        user_solved_slugs: Array.from(userSolvedSlugs),
-        solved_easy_count: easyCount,
-        solved_med_count: medCount,
-        solved_hard_count: hardCount,
-        total_solved: totalCount,
-      });
-
-      renderDonutDistribution(easyCount, medCount, hardCount);
-      renderRoadmapList('all');
-      updateNextRecommendation();
-
-      bar.style.width = '100%';
-      msg.innerText = `✓ Synced all ${totalCount} solutions to progress & roadmap!`;
-      showToast(`✓ Synced all ${totalCount} solutions!`);
-    } catch (err) {
-      msg.innerText = `Notice: Please log in to leetcode.com in this browser.`;
-    }
-  });
-
   // Join Squad Button
   document.getElementById('btn-join-squad')?.addEventListener('click', async () => {
     const code = document.getElementById('input-join-code').value.trim();
