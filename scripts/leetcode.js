@@ -1,5 +1,6 @@
 /**
  * LeetCode GraphQL & REST API Client for LeetSync Squads
+ * Real production queries with authenticated session support.
  */
 
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
@@ -22,7 +23,7 @@ export class LeetCodeAPI {
       });
 
       if (!response.ok) {
-        throw new Error(`LeetCode GraphQL error: HTTP ${response.status}`);
+        throw new Error(`HTTP ${response.status}`);
       }
 
       const data = await response.json();
@@ -32,7 +33,7 @@ export class LeetCodeAPI {
 
       return data.data;
     } catch (err) {
-      console.error('[LeetCodeAPI] Query failed:', err);
+      console.warn('[LeetCodeAPI] Query notice:', err.message);
       throw err;
     }
   }
@@ -54,6 +55,48 @@ export class LeetCodeAPI {
     `;
     const data = await this.query(gql);
     return data?.userStatus || null;
+  }
+
+  /**
+   * Fetch real user profile stats, streak, and solved count.
+   */
+  static async getUserStats(username) {
+    if (!username) return null;
+    const gql = `
+      query userProfileData($username: String!) {
+        matchedUser(username: $username) {
+          username
+          submitStatsGlobal {
+            acSubmissionNum {
+              difficulty
+              count
+            }
+          }
+          userCalendar {
+            streak
+            totalActiveDays
+          }
+        }
+      }
+    `;
+    const data = await this.query(gql, { username });
+    const user = data?.matchedUser;
+    if (!user) return null;
+
+    const totalSolvedItem = user.submitStatsGlobal?.acSubmissionNum?.find(i => i.difficulty === 'All');
+    const easySolvedItem = user.submitStatsGlobal?.acSubmissionNum?.find(i => i.difficulty === 'Easy');
+    const medSolvedItem = user.submitStatsGlobal?.acSubmissionNum?.find(i => i.difficulty === 'Medium');
+    const hardSolvedItem = user.submitStatsGlobal?.acSubmissionNum?.find(i => i.difficulty === 'Hard');
+
+    return {
+      username: user.username,
+      totalSolved: totalSolvedItem?.count || 0,
+      easySolved: easySolvedItem?.count || 0,
+      mediumSolved: medSolvedItem?.count || 0,
+      hardSolved: hardSolvedItem?.count || 0,
+      streak: user.userCalendar?.streak || 0,
+      totalActiveDays: user.userCalendar?.totalActiveDays || 0,
+    };
   }
 
   /**
@@ -205,9 +248,6 @@ export class LeetCodeAPI {
   }
 }
 
-/**
- * Mapping from LeetCode language names to file extensions matching LeetSync.
- */
 export const LANGUAGE_EXTENSIONS = {
   python: '.py',
   python3: '.py',
