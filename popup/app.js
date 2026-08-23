@@ -100,7 +100,12 @@ async function loadStoredState() {
     }
   }
 
-  const xp = data.user_xp || 0;
+  let xp = data.user_xp || 0;
+  // If XP was cached from previous legacy run, wipe it to 0
+  if (xp >= 1000 || !data.last_solved_date) {
+    xp = 0;
+    await chrome.storage.local.set({ user_xp: 0 });
+  }
 
   // Header badges (defaults strictly to real 0 on fresh install)
   document.getElementById('header-streak-count').innerText = streak;
