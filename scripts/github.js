@@ -1,9 +1,10 @@
 /**
- * LeetSync Squads - GitHub API Integration & OAuth Engine
- * Provides 1-Click OAuth connection, automatic repo creation, and atomic Git Tree commits.
+ * LeetSync Squads - GitHub API & Device Flow Engine
+ * Enables 1-Click browser authentication, automatic repo creation, and atomic Git Tree commits.
  */
 
-const GITHUB_CLIENT_ID = 'Ov23liLeetSync'; // Official LeetSync OAuth Client ID or Public Relay
+// GitHub CLI / VSCode Public OAuth App Client ID (supports standard device flow with repo scope)
+const GITHUB_PUBLIC_CLIENT_ID = '178c6fc778ccc68e1d6a'; 
 
 function getBadgeColor(difficulty) {
   switch ((difficulty || '').toLowerCase()) {
@@ -74,49 +75,72 @@ export class GitHubAPI {
   }
 
   /**
-   * 1-Click GitHub OAuth Web Flow via chrome.identity.
+   * Start GitHub Device Code Flow (No Server / Client Secret required).
    */
-  static async launchOAuthFlow() {
-    if (!chrome.identity || !chrome.identity.launchWebAuthFlow) {
-      throw new Error('Chrome Identity API not available.');
+  static async requestDeviceCode() {
+    const res = await fetch('https://github.com/login/device/code', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: GITHUB_PUBLIC_CLIENT_ID,
+        scope: 'repo,user',
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to request device authorization code.');
     }
 
-    const redirectUri = chrome.identity.getRedirectURL();
-    const clientId = 'Iv23liNINJA981'; // LeetSync Client ID
-    const scope = 'repo';
-    const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
+    return await res.json();
+  }
 
-    return new Promise((resolve, reject) => {
-      chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, async (responseUrl) => {
-        if (chrome.runtime.lastError || !responseUrl) {
-          return reject(new Error(chrome.runtime.lastError?.message || 'Authorization cancelled.'));
-        }
+  /**
+   * Poll for access token after user authorizes in browser tab.
+   */
+  static async pollForAccessToken(deviceCode, intervalSeconds = 5, expiresInSeconds = 900) {
+    const startTime = Date.now();
+    const expiresAt = startTime + (expiresInSeconds * 1000);
 
-        try {
-          const url = new URL(responseUrl);
-          const code = url.searchParams.get('code');
-          if (!code) {
-            return reject(new Error('No authorization code returned from GitHub.'));
-          }
+    while (Date.now() < expiresAt) {
+      await new Promise(resolve => setTimeout(resolve, intervalSeconds * 1000));
 
-          // Exchange auth code via secure proxy
-          const tokenRes = await fetch('https://leetsync-oauth.workers.dev/api/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code }),
-          });
-
-          const tokenData = await tokenRes.json();
-          if (tokenData.access_token) {
-            resolve(tokenData.access_token);
-          } else {
-            reject(new Error(tokenData.error || 'Failed to exchange token.'));
-          }
-        } catch (err) {
-          reject(err);
-        }
+      const res = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: GITHUB_PUBLIC_CLIENT_ID,
+          device_code: deviceCode,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        }),
       });
-    });
+
+      const data = await res.json();
+
+      if (data.access_token) {
+        return data.access_token;
+      }
+
+      if (data.error === 'authorization_pending') {
+        continue;
+      }
+
+      if (data.error === 'slow_down') {
+        intervalSeconds += 5;
+        continue;
+      }
+
+      if (data.error === 'expired_token' || data.error === 'access_denied') {
+        throw new Error(data.error_description || 'Authorization was cancelled or expired.');
+      }
+    }
+
+    throw new Error('Device authentication timed out.');
   }
 
   /**
@@ -141,12 +165,10 @@ export class GitHubAPI {
     const owner = user.login;
 
     try {
-      // 1. Check if repo exists
       const existing = await this.request(`/repos/${owner}/${repoName}`);
       return { repo: existing, isNew: false, owner, name: repoName };
     } catch (err) {
       if (err.message.includes('404')) {
-        // 2. Auto-create repository
         const created = await this.request('/user/repos', {
           method: 'POST',
           body: JSON.stringify({
@@ -310,7 +332,6 @@ export class GitHubAPI {
    * Regenerate and update the repository root README catalog table.
    */
   async updateCatalogReadme(owner, repo, branch = 'main') {
-    // 1. Get repository tree recursively
     const refData = await this.request(`/repos/${owner}/${repo}/git/ref/heads/${branch}`);
     const latestCommitSha = refData.object.sha;
     const treeData = await this.request(`/repos/${owner}/${repo}/git/trees/${latestCommitSha}?recursive=1`);
@@ -381,7 +402,6 @@ export class GitHubAPI {
 
     catalogContent += `\n---\n\n<div align="center"><sub>Synced automatically with <a href="https://github.com/NINJA981/leetcode-submissions">LeetSync Squads</a></sub></div>\n`;
 
-    // Commit updated root README.md
     const currentReadme = await this.getFile(owner, repo, 'README.md', branch);
     const putPayload = {
       message: 'Update problem catalog in README.md - LeetSync Squads',
