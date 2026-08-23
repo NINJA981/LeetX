@@ -1,13 +1,15 @@
 /**
  * LeetSync Squads - Popup Application Logic & View Router
- * Production-ready: Zero mock data, real LeetCode GraphQL sync & live Firebase rooms.
+ * Production-ready: Dynamic Roadmap switching, solved problems auto-detection, and clean peer duels.
  */
 
 import { LeetCodeAPI } from '../scripts/leetcode.js';
 import { GitHubAPI } from '../scripts/github.js';
 import { FirebaseSquads } from '../scripts/firebase.js';
 
-let blind75Data = [];
+let currentRoadmapData = [];
+let currentRoadmapType = 'blind75';
+let userSolvedSlugs = new Set();
 let currentUsername = null;
 
 // Initialize on DOM ready
@@ -16,7 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadStoredState();
   await syncLiveLeetCodeProfile();
   await loadDailyChallenge();
-  await loadBlind75Roadmap();
+  await loadRoadmap(currentRoadmapType);
   setupEventListeners();
 });
 
@@ -55,13 +57,17 @@ async function loadStoredState() {
     'user_xp',
     'my_squad_code',
     'leetcode_username',
+    'user_solved_slugs',
     'duel_wins',
     'duel_played',
   ]);
 
   currentUsername = data.leetcode_username || null;
+  if (data.user_solved_slugs && Array.isArray(data.user_solved_slugs)) {
+    userSolvedSlugs = new Set(data.user_solved_slugs);
+  }
 
-  // Header badges (defaults to real 0 until loaded)
+  // Header badges
   document.getElementById('header-streak-count').innerText = data.streak_count || 0;
   document.getElementById('header-xp-val').innerText = data.user_xp || 0;
 
@@ -127,8 +133,10 @@ async function syncLiveLeetCodeProfile() {
 
       const stats = await LeetCodeAPI.getUserStats(currentUsername);
       if (stats) {
+        // Daily consecutive streak from calendar
         const streak = stats.streak || 0;
         const totalSolved = stats.totalSolved || 0;
+        // XP calculation: 10 per Easy, 25 per Medium, 50 per Hard
         const xp = (stats.easySolved * 10) + (stats.mediumSolved * 25) + (stats.hardSolved * 50);
 
         document.getElementById('header-streak-count').innerText = streak;
@@ -173,15 +181,17 @@ async function loadDailyChallenge() {
 }
 
 /**
- * Load Blind 75 Roadmap Dataset.
+ * Load Selected Roadmap (Blind 75 or NeetCode 150).
  */
-async function loadBlind75Roadmap() {
+async function loadRoadmap(type = 'blind75') {
+  currentRoadmapType = type;
+  const fileName = type === 'neetcode150' ? 'neetcode150.json' : 'blind75.json';
   try {
-    const response = await fetch(chrome.runtime.getURL('assets/data/blind75.json'));
-    blind75Data = await response.json();
+    const response = await fetch(chrome.runtime.getURL(`assets/data/${fileName}`));
+    currentRoadmapData = await response.json();
     renderRoadmapList('all');
   } catch (err) {
-    console.error('[Popup] Failed to load blind75 dataset:', err);
+    console.error('[Popup] Failed to load roadmap dataset:', err);
   }
 }
 
@@ -190,32 +200,40 @@ function renderRoadmapList(categoryFilter = 'all') {
   container.innerHTML = '';
 
   const filtered = categoryFilter === 'all'
-    ? blind75Data
-    : blind75Data.filter(item => item.category === categoryFilter);
+    ? currentRoadmapData
+    : currentRoadmapData.filter(item => item.category === categoryFilter || (categoryFilter === 'Arrays & Hashing' && item.category === 'Arrays'));
+
+  let solvedCount = 0;
 
   filtered.forEach(prob => {
     const itemEl = document.createElement('div');
     itemEl.className = 'roadmap-item';
+    const isSolved = userSolvedSlugs.has(prob.slug);
+    if (isSolved) solvedCount++;
 
     itemEl.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">#${prob.id}</span>
         <a href="https://leetcode.com/problems/${prob.slug}/" target="_blank" style="color: var(--text-primary); text-decoration: none; font-weight: 500;">${prob.title}</a>
       </div>
-      <span class="diff-badge ${prob.difficulty}">${prob.difficulty}</span>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        ${isSolved ? '<span style="color: var(--color-green-text); font-size: 11px; font-weight: 600; font-family: var(--font-mono);">✓ Solved</span>' : ''}
+        <span class="diff-badge ${prob.difficulty}">${prob.difficulty}</span>
+      </div>
     `;
 
     container.appendChild(itemEl);
   });
 
-  const total = blind75Data.length;
-  document.getElementById('blind75-pct').innerText = '0%';
-  document.getElementById('blind75-bar').style.width = '0%';
-  document.getElementById('blind75-count').innerText = `0 / ${total} Solved`;
+  const total = currentRoadmapData.length;
+  const pct = total > 0 ? Math.round((solvedCount / total) * 100) : 0;
+  document.getElementById('blind75-pct').innerText = `${pct}%`;
+  document.getElementById('blind75-bar').style.width = `${pct}%`;
+  document.getElementById('blind75-count').innerText = `${solvedCount} / ${total} Solved`;
 }
 
 /**
- * Render Squad Leaderboard and Activity Stream (100% real members, zero mock data).
+ * Render Squad Leaderboard and Activity Stream with strict member deduplication.
  */
 async function renderSquad(squadCode) {
   const stored = await chrome.storage.local.get([
@@ -227,8 +245,8 @@ async function renderSquad(squadCode) {
     'user_xp',
   ]);
 
-  const username = stored.leetcode_username || 'You';
-  const squad = await FirebaseSquads.joinOrCreateSquad(squadCode, {
+  const username = stored.leetcode_username || currentUsername || 'You';
+  const rawSquad = await FirebaseSquads.joinOrCreateSquad(squadCode, {
     username,
     streak: stored.streak_count || 0,
     todaySolved: stored.today_solved || 0,
@@ -236,12 +254,24 @@ async function renderSquad(squadCode) {
     xp: stored.user_xp || 0,
   });
 
+  // Strict deduplication & filter out ghost/test members
+  const memberMap = new Map();
+  (rawSquad.members || []).forEach(m => {
+    if (!m.username || m.username === 'undefined' || m.username === 'null') return;
+    // If username is 'You' and we know the real username, skip 'You'
+    if (m.username === 'You' && username !== 'You') return;
+    // If username is temp random string like AH0CQLRCsa and we know real user, skip
+    if (m.username.length === 10 && m.username !== username && username !== 'You') return;
+
+    memberMap.set(m.username, m);
+  });
+
+  const members = Array.from(memberMap.values());
+  members.sort((a, b) => (b.todaySolved || 0) - (a.todaySolved || 0) || (b.streak || 0) - (a.streak || 0));
+
   // Populate leaderboard
   const listEl = document.getElementById('squad-members-list');
   listEl.innerHTML = '';
-
-  const members = squad.members || [];
-  members.sort((a, b) => (b.todaySolved || 0) - (a.todaySolved || 0) || (b.streak || 0) - (a.streak || 0));
 
   if (members.length === 0) {
     listEl.innerHTML = '<div class="activity-empty">No members in squad yet. Share your code to invite friends!</div>';
@@ -280,7 +310,7 @@ async function renderSquad(squadCode) {
   // Populate Activity Feed
   const feedEl = document.getElementById('squad-activity-feed');
   feedEl.innerHTML = '';
-  const activities = (squad.activityFeed || []).slice(0, 5);
+  const activities = (rawSquad.activityFeed || []).slice(0, 5);
 
   if (activities.length === 0) {
     feedEl.innerHTML = '<div class="activity-empty">No recent activity. Solve a problem to light up the feed!</div>';
@@ -293,12 +323,13 @@ async function renderSquad(squadCode) {
     });
   }
 
-  // Populate Duel Opponents (strictly real squad peers)
+  // Populate Duel Opponents (Strictly exclude self!)
   const opponentSelect = document.getElementById('duel-opponent-select');
   if (opponentSelect) {
     opponentSelect.innerHTML = '<option value="">Select a squad mate...</option>';
     let peerCount = 0;
     members.forEach(m => {
+      // Never allow challenging yourself or 'You'
       if (m.username !== username && m.username !== 'You') {
         peerCount++;
         const opt = document.createElement('option');
@@ -309,7 +340,7 @@ async function renderSquad(squadCode) {
     });
 
     if (peerCount === 0) {
-      opponentSelect.innerHTML = '<option value="">No squad peers yet (Share #CODE)</option>';
+      opponentSelect.innerHTML = '<option value="">No other peers in room (Share #CODE)</option>';
     }
   }
 }
@@ -318,6 +349,19 @@ async function renderSquad(squadCode) {
  * Setup Event Listeners for buttons and forms.
  */
 function setupEventListeners() {
+  // Roadmap Selector Dropdown
+  document.getElementById('roadmap-type-select')?.addEventListener('change', (e) => {
+    loadRoadmap(e.target.value);
+  });
+
+  // Leave / Reset Squad Button
+  document.getElementById('btn-leave-squad')?.addEventListener('click', async () => {
+    const newCode = FirebaseSquads.generateRoomCode();
+    await chrome.storage.local.set({ my_squad_code: newCode });
+    document.getElementById('squad-room-code').innerText = newCode;
+    await renderSquad(newCode);
+  });
+
   // 1-Click Backfill Button
   document.getElementById('btn-backfill-all')?.addEventListener('click', async () => {
     const box = document.getElementById('backfill-progress-box');
@@ -334,8 +378,13 @@ function setupEventListeners() {
         bar.style.width = `${Math.min(95, count)}%`;
       });
 
+      // Save user's solved slugs to mark roadmap problems automatically!
+      acceptedSubs.forEach(s => userSolvedSlugs.add(s.titleSlug));
+      await chrome.storage.local.set({ user_solved_slugs: Array.from(userSolvedSlugs) });
+
       bar.style.width = '100%';
-      msg.innerText = `✓ Found ${acceptedSubs.length} accepted problems to sync!`;
+      msg.innerText = `✓ Found ${acceptedSubs.length} problems! Solutions mapped to roadmap.`;
+      renderRoadmapList('all');
     } catch (err) {
       msg.innerText = `Notice: Please log in to leetcode.com in this browser.`;
     }
@@ -438,8 +487,8 @@ function setupEventListeners() {
     const probFormat = document.getElementById('duel-problem-select').value;
     let prob = { title: 'Two Sum', slug: 'two-sum' };
 
-    if (probFormat === 'random_blind75' && blind75Data.length > 0) {
-      const rand = blind75Data[Math.floor(Math.random() * blind75Data.length)];
+    if (probFormat === 'random_blind75' && currentRoadmapData.length > 0) {
+      const rand = currentRoadmapData[Math.floor(Math.random() * currentRoadmapData.length)];
       prob = { title: `${rand.id}. ${rand.title}`, slug: rand.slug };
     }
 

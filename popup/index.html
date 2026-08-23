@@ -18,13 +18,13 @@
         </div>
       </div>
       <div class="header-badges">
-        <div class="badge-streak" id="badge-streak-container">
+        <div class="badge-streak" id="badge-streak-container" title="Daily Consecutive Streak">
           <span class="streak-flame">🔥</span>
-          <span id="header-streak-count">1</span>
+          <span id="header-streak-count">0</span>
         </div>
-        <div class="badge-xp" id="header-xp-badge">
+        <div class="badge-xp" id="header-xp-badge" title="XP Earned from Solves">
           <span>XP</span>
-          <span id="header-xp-val">120</span>
+          <span id="header-xp-val">0</span>
         </div>
       </div>
     </header>
@@ -60,7 +60,7 @@
         <!-- Daily Problem Launcher -->
         <div class="card daily-challenge-card" id="daily-challenge-box">
           <div class="card-subtitle">DAILY CHALLENGE</div>
-          <div class="daily-title" id="daily-problem-title">Loading today's problem...</div>
+          <div class="daily-title" id="daily-problem-title">Loading today's challenge...</div>
           <div class="daily-meta">
             <span class="diff-badge" id="daily-diff-badge">Medium</span>
             <a href="https://leetcode.com/problemset/" target="_blank" class="btn-launch" id="daily-launch-btn">Solve Now ↗</a>
@@ -97,6 +97,7 @@
             <input type="text" id="input-join-code" placeholder="Enter #CODE to join" class="input-dark">
             <button class="btn-secondary" id="btn-join-squad">Join</button>
             <button class="btn-ghost" id="btn-copy-squad" title="Copy code">📋</button>
+            <button class="btn-ghost" id="btn-leave-squad" title="New / Reset Squad">🔄</button>
           </div>
         </div>
 
@@ -134,7 +135,7 @@
             <div class="form-group">
               <label class="form-label">Problem Format:</label>
               <select id="duel-problem-select" class="select-dark">
-                <option value="random_blind75">Blind 75 (Random Medium)</option>
+                <option value="random_blind75">Blind 75 (Random Problem)</option>
                 <option value="daily">Today's Daily Challenge</option>
                 <option value="random_easy">Speed Sprint (Easy)</option>
                 <option value="random_hard">Boss Fight (Hard)</option>
@@ -149,9 +150,9 @@
               <span class="active-duel-badge">MATCH IN PROGRESS</span>
               <span class="active-duel-timer" id="duel-live-timer">00:00</span>
             </div>
-            <div class="active-duel-title" id="active-duel-problem-title">347. Top K Frequent Elements</div>
+            <div class="active-duel-title" id="active-duel-problem-title">Two Sum</div>
             <div class="active-duel-actions">
-              <a href="https://leetcode.com/problemset/" target="_blank" class="btn-secondary" id="active-duel-link">Open Problem ↗</a>
+              <a href="https://leetcode.com/problems/two-sum/" target="_blank" class="btn-secondary" id="active-duel-link">Open Problem ↗</a>
               <button class="btn-ghost" id="btn-cancel-duel">Forfeit</button>
             </div>
           </div>
@@ -178,19 +179,25 @@
       <section id="view-roadmap" class="tab-view">
         <div class="card roadmap-progress-card">
           <div class="card-header-flex">
-            <span class="card-subtitle">BLIND 75 ROADMAP</span>
+            <select id="roadmap-type-select" class="select-dark" style="width: auto; padding: 4px 8px; font-weight: 600;">
+              <option value="blind75">Blind 75 Roadmap</option>
+              <option value="neetcode150">NeetCode 150 Roadmap</option>
+            </select>
             <span class="roadmap-pct" id="blind75-pct">0%</span>
           </div>
-          <div class="goal-progress-bar-bg">
+          <div class="goal-progress-bar-bg" style="margin-top: 6px;">
             <div class="goal-progress-bar-fill" id="blind75-bar" style="width: 0%;"></div>
           </div>
-          <span class="roadmap-count" id="blind75-count">0 / 75 Completed</span>
+          <span class="roadmap-count" id="blind75-count" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); margin-top: 4px;">0 / 75 Solved</span>
         </div>
 
         <div class="roadmap-filter-tabs">
           <button class="filter-pill active" data-cat="all">All</button>
           <button class="filter-pill" data-cat="Arrays & Hashing">Arrays</button>
           <button class="filter-pill" data-cat="Two Pointers">Pointers</button>
+          <button class="filter-pill" data-cat="Sliding Window">Window</button>
+          <button class="filter-pill" data-cat="Stack">Stack</button>
+          <button class="filter-pill" data-cat="Binary Search">Binary</button>
           <button class="filter-pill" data-cat="Trees">Trees</button>
           <button class="filter-pill" data-cat="Dynamic Programming">DP</button>
         </div>
@@ -233,7 +240,7 @@
           <div class="divider-text"><span>LIVE SQUADS DATABASE</span></div>
 
           <div class="form-group">
-            <label class="form-label">Firebase Project ID (Optional):</label>
+            <label class="form-label">Firebase Project ID:</label>
             <input type="text" id="input-firebase-project" placeholder="leetsync-squads-app" class="input-dark">
           </div>
 
