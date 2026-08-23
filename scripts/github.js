@@ -160,6 +160,14 @@ export class GitHubAPI {
   /**
    * Automatically ensure the target repository exists. If not, auto-create it via API.
    */
+  /**
+   * Static helper to ensure target repository exists.
+   */
+  static async ensureRepository(repoName = 'leetcode-submissions', token) {
+    const api = new GitHubAPI(token);
+    return await api.ensureRepository(repoName);
+  }
+
   async ensureRepository(repoName = 'leetcode-submissions') {
     const user = await this.getUser();
     const owner = user.login;

@@ -74,7 +74,8 @@ async function handleLinkToken(token) {
 
     // Auto-create/link leetcode-submissions repository
     if (statusEl) statusEl.innerText = 'Linking leetcode-submissions repository...';
-    await GitHubAPI.ensureRepository('leetcode-submissions', cleanToken);
+    const apiInstance = new GitHubAPI(cleanToken);
+    await apiInstance.ensureRepository('leetcode-submissions');
 
     await chrome.storage.local.set({
       github_token: cleanToken,
@@ -209,7 +210,8 @@ async function performSolutionSync(source = 'stats') {
     // 4. Ensure GitHub repository is verified
     if (token) {
       try {
-        await GitHubAPI.ensureRepository('leetcode-submissions', token);
+        const apiInstance = new GitHubAPI(token);
+        await apiInstance.ensureRepository('leetcode-submissions');
       } catch (repoErr) {
         console.warn('[Sync] Repo check notice:', repoErr);
       }
