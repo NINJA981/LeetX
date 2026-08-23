@@ -1,6 +1,6 @@
 /**
- * LeetSync Squads - Popup Application Logic & View Router
- * Production-ready: Authentic 0-default Streak & XP, Dynamic Leveling, and Clean Peer Duels.
+ * LeetSync Squads - Light Mode Application Engine
+ * Renders live donut charts, 7-day momentum strips, real-time roadmap checkoffs, and peer duels.
  */
 
 import { LeetCodeAPI } from '../scripts/leetcode.js';
@@ -70,11 +70,13 @@ async function loadStoredState() {
     'last_solved_date',
     'my_squad_code',
     'user_solved_slugs',
+    'solved_easy_count',
+    'solved_med_count',
+    'solved_hard_count',
     'duel_wins',
     'duel_played',
   ]);
 
-  // Priority: User's custom display name > GitHub username > Default NINJA981
   currentUsername = data.display_name || data.github_repo_owner || 'NINJA981';
   document.getElementById('input-display-name').value = currentUsername;
 
@@ -101,38 +103,55 @@ async function loadStoredState() {
   }
 
   let xp = data.user_xp || 0;
-  // If XP was cached from previous legacy run, wipe it to 0
   if (xp >= 1000 || !data.last_solved_date) {
     xp = 0;
     await chrome.storage.local.set({ user_xp: 0 });
   }
 
-  // Header badges (defaults strictly to real 0 on fresh install)
+  // Header badges
   document.getElementById('header-streak-count').innerText = streak;
   document.getElementById('header-xp-val').innerText = xp;
 
-  // Today goal
-  document.getElementById('today-solved-text').innerText = `${todaySolved} / 1 Solved`;
-  const todayPct = Math.min(100, todaySolved * 100);
-  document.getElementById('today-progress-bar').style.width = `${todayPct}%`;
+  // Hero Momentum Strip
+  const streakTitle = document.getElementById('momentum-streak-title');
+  const streakDesc = document.getElementById('momentum-streak-desc');
+  const statusText = document.getElementById('today-status-text');
 
-  const statusPill = document.getElementById('today-status-pill');
-  if (todaySolved > 0) {
-    statusPill.innerText = 'Completed ✓';
-    statusPill.className = 'status-pill success';
+  if (streak === 0) {
+    streakTitle.innerText = '0 Day Streak';
+    streakDesc.innerText = "Solve today's challenge to ignite your streak.";
   } else {
-    statusPill.innerText = 'Pending ⏳';
-    statusPill.className = 'status-pill';
+    streakTitle.innerText = `${streak} Day Streak 🔥`;
+    streakDesc.innerText = todaySolved > 0 ? "You're all done for today! Momentum preserved." : "Keep the flame burning. Complete today's problem.";
   }
+
+  if (todaySolved > 0) {
+    statusText.innerText = 'Completed ✓';
+    statusText.style.color = 'var(--color-easy)';
+  } else {
+    statusText.innerText = 'Pending ⏳';
+    statusText.style.color = 'var(--color-med)';
+  }
+
+  renderWeekStrip(streak, todaySolved > 0);
+
+  // Solved Distribution Donut
+  const easy = data.solved_easy_count || 0;
+  const med = data.solved_med_count || 0;
+  const hard = data.solved_hard_count || 0;
+  renderDonutDistribution(easy, med, hard);
 
   // GitHub Repo
   const repoNameEl = document.getElementById('sync-repo-name');
+  const indicator = document.getElementById('github-sync-indicator');
   if (data.github_repo_owner && data.github_repo_name) {
     repoNameEl.innerText = `${data.github_repo_owner}/${data.github_repo_name}`;
-    repoNameEl.style.color = 'var(--color-green-text)';
+    indicator.innerText = '● Connected';
+    indicator.style.color = 'var(--color-easy)';
   } else {
     repoNameEl.innerText = 'Not Connected';
-    repoNameEl.style.color = 'var(--text-muted)';
+    indicator.innerText = '● Standby';
+    indicator.style.color = 'var(--text-muted)';
   }
 
   // Settings inputs
@@ -142,9 +161,6 @@ async function loadStoredState() {
   }
   if (data.github_branch) {
     document.getElementById('input-github-branch').value = data.github_branch;
-  }
-  if (data.firebase_project_id) {
-    document.getElementById('input-firebase-project').value = data.firebase_project_id;
   }
 
   // Squad State
@@ -161,16 +177,79 @@ async function loadStoredState() {
 }
 
 /**
- * Validate live LeetCode session without overwriting streak/XP.
+ * Render 7-day activity week strip (Mon-Sun).
+ */
+function renderWeekStrip(streak, isTodaySolved) {
+  const now = new Date();
+  const dayOfWeek = (now.getDay() + 6) % 7; // 0=Mon, 6=Sun
+
+  for (let i = 0; i < 7; i++) {
+    const dot = document.getElementById(`dot-day-${i}`);
+    if (!dot) continue;
+
+    dot.className = 'day-dot';
+    dot.innerText = '';
+
+    if (i === dayOfWeek) {
+      dot.classList.add('today');
+      if (isTodaySolved) {
+        dot.classList.add('completed');
+        dot.innerText = '✓';
+      }
+    } else if (i < dayOfWeek && i >= dayOfWeek - streak + (isTodaySolved ? 1 : 0)) {
+      dot.classList.add('completed');
+      dot.innerText = '✓';
+    }
+  }
+}
+
+/**
+ * Render SVG Donut Chart for Solved Problem Distribution.
+ */
+function renderDonutDistribution(easy = 0, med = 0, hard = 0) {
+  const total = easy + med + hard;
+  document.getElementById('donut-total-count').innerText = total;
+  document.getElementById('total-solved-meta').innerText = `${total} Total`;
+  document.getElementById('count-easy').innerText = easy;
+  document.getElementById('count-med').innerText = med;
+  document.getElementById('count-hard').innerText = hard;
+
+  const easyEl = document.getElementById('donut-easy');
+  const medEl = document.getElementById('donut-med');
+  const hardEl = document.getElementById('donut-hard');
+
+  if (total === 0) {
+    easyEl.setAttribute('stroke-dasharray', '0 100');
+    medEl.setAttribute('stroke-dasharray', '0 100');
+    hardEl.setAttribute('stroke-dasharray', '0 100');
+    return;
+  }
+
+  const easyPct = (easy / total) * 100;
+  const medPct = (med / total) * 100;
+  const hardPct = (hard / total) * 100;
+
+  easyEl.setAttribute('stroke-dasharray', `${easyPct} ${100 - easyPct}`);
+  easyEl.setAttribute('stroke-dashoffset', '0');
+
+  medEl.setAttribute('stroke-dasharray', `${medPct} ${100 - medPct}`);
+  medEl.setAttribute('stroke-dashoffset', `${-easyPct}`);
+
+  hardEl.setAttribute('stroke-dasharray', `${hardPct} ${100 - hardPct}`);
+  hardEl.setAttribute('stroke-dashoffset', `${-(easyPct + medPct)}`);
+}
+
+/**
+ * Validate live LeetCode session.
  */
 async function syncLiveLeetCodeSession() {
   try {
     const userStatus = await LeetCodeAPI.getCurrentUser();
     if (userStatus && userStatus.isSignedIn) {
-      console.log('[LeetSync] Logged into LeetCode session.');
+      console.log('[LeetSync] Active LeetCode session verified.');
     }
   } catch (err) {
-    console.warn('[Popup] LeetCode session check:', err.message);
+    console.warn('[Popup] LeetCode session check notice:', err.message);
   }
 }
 
@@ -181,16 +260,16 @@ async function loadDailyChallenge() {
   try {
     const daily = await LeetCodeAPI.getDailyChallenge();
     if (daily && daily.question) {
-      document.getElementById('daily-problem-title').innerText = `${daily.question.questionFrontendId}. ${daily.question.title}`;
+      document.getElementById('daily-problem-title').innerText = `#${daily.question.questionFrontendId} · ${daily.question.title}`;
       const badge = document.getElementById('daily-diff-badge');
-      badge.innerText = daily.question.difficulty || 'Medium';
-      badge.className = `diff-badge ${daily.question.difficulty || 'Medium'}`;
+      const diff = daily.question.difficulty || 'Medium';
+      badge.innerText = diff;
+      badge.className = `diff-badge ${diff}`;
 
       const launchBtn = document.getElementById('daily-launch-btn');
       launchBtn.href = daily.link;
     }
   } catch (err) {
-    console.warn('[Popup] Daily challenge offline notice:', err.message);
     document.getElementById('daily-problem-title').innerText = 'Explore Problemset';
     document.getElementById('daily-launch-btn').href = 'https://leetcode.com/problemset/';
   }
@@ -223,17 +302,17 @@ function renderRoadmapList(categoryFilter = 'all') {
 
   filtered.forEach(prob => {
     const itemEl = document.createElement('div');
-    itemEl.className = 'roadmap-item';
+    itemEl.className = 'roadmap-row';
     const isSolved = userSolvedSlugs.has(prob.slug);
     if (isSolved) solvedCount++;
 
     itemEl.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">#${prob.id}</span>
-        <a href="https://leetcode.com/problems/${prob.slug}/" target="_blank" style="color: var(--text-primary); text-decoration: none; font-weight: 500;">${prob.title}</a>
+      <div class="prob-left">
+        <span class="prob-id">#${prob.id}</span>
+        <a href="https://leetcode.com/problems/${prob.slug}/" target="_blank" class="prob-title-link">${prob.title}</a>
       </div>
       <div style="display: flex; align-items: center; gap: 6px;">
-        ${isSolved ? '<span style="color: var(--color-green-text); font-size: 11px; font-weight: 600; font-family: var(--font-mono);">✓ Solved</span>' : ''}
+        ${isSolved ? '<span style="color: var(--color-easy); font-size: 11px; font-weight: 600; font-family: var(--font-mono);">✓ Solved</span>' : ''}
         <span class="diff-badge ${prob.difficulty}">${prob.difficulty}</span>
       </div>
     `;
@@ -243,13 +322,12 @@ function renderRoadmapList(categoryFilter = 'all') {
 
   const total = currentRoadmapData.length;
   const pct = total > 0 ? Math.round((solvedCount / total) * 100) : 0;
-  document.getElementById('blind75-pct').innerText = `${pct}%`;
   document.getElementById('blind75-bar').style.width = `${pct}%`;
-  document.getElementById('blind75-count').innerText = `${solvedCount} / ${total} Solved`;
+  document.getElementById('blind75-count').innerText = `${solvedCount} / ${total} Solved (${pct}%)`;
 }
 
 /**
- * Render Squad Leaderboard and Activity Stream with strict member cleanup.
+ * Render Squad Leaderboard and Activity Stream.
  */
 async function renderSquad(squadCode, currentStreak = 0, currentTodaySolved = 0, currentXP = 0) {
   const stored = await chrome.storage.local.get([
@@ -276,7 +354,6 @@ async function renderSquad(squadCode, currentStreak = 0, currentTodaySolved = 0,
     memberMap.set(m.username, m);
   });
 
-  // Ensure current user is present with authentic live streak & xp
   memberMap.set(username, {
     username,
     streak: currentStreak,
@@ -296,26 +373,26 @@ async function renderSquad(squadCode, currentStreak = 0, currentTodaySolved = 0,
 
   members.forEach((m, idx) => {
     const row = document.createElement('div');
-    row.className = 'leaderboard-item';
+    row.className = `leaderboard-row ${m.username === username ? 'current-user' : ''}`;
     const isSolved = (m.todaySolved || 0) > 0;
-    const rankNum = `#${idx + 1}`;
+    const rankNum = String(idx + 1).padStart(2, '0');
 
     row.innerHTML = `
-      <div class="member-info">
-        <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${rankNum}</span>
+      <div class="member-left">
+        <span class="member-rank">${rankNum}</span>
         <span class="member-name">@${m.username}</span>
-        <span class="member-streak">🔥 ${m.streak || 0}d</span>
+        <span class="member-streak-badge">🔥 ${m.streak || 0}d</span>
       </div>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 11px; font-family: var(--font-mono); color: ${isSolved ? 'var(--color-green-text)' : 'var(--color-amber)'}">${isSolved ? '✓ Done' : '⏳ Pending'}</span>
-        ${!isSolved && m.username !== username ? `<button class="nudge-btn" data-user="${m.username}" title="Send Nudge">👋</button>` : ''}
+      <div class="member-right">
+        <span class="member-status ${isSolved ? 'done' : 'pending'}">${isSolved ? '✓ Done' : '⏳ Pending'}</span>
+        ${!isSolved && m.username !== username ? `<button class="btn-nudge" data-user="${m.username}" title="Nudge">👋</button>` : ''}
       </div>
     `;
     listEl.appendChild(row);
   });
 
   // Attach Nudge events
-  document.querySelectorAll('.nudge-btn').forEach(btn => {
+  document.querySelectorAll('.btn-nudge').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const targetUser = e.currentTarget.dataset.user;
       await FirebaseSquads.sendNudge(squadCode, username, targetUser, '👋');
@@ -390,10 +467,11 @@ function setupEventListeners() {
       });
       document.getElementById('header-streak-count').innerText = 0;
       document.getElementById('header-xp-val').innerText = 0;
-      document.getElementById('today-solved-text').innerText = '0 / 1 Solved';
-      document.getElementById('today-progress-bar').style.width = '0%';
-      document.getElementById('today-status-pill').innerText = 'Pending ⏳';
-      document.getElementById('today-status-pill').className = 'status-pill';
+      document.getElementById('momentum-streak-title').innerText = '0 Day Streak';
+      document.getElementById('momentum-streak-desc').innerText = "Solve today's challenge to ignite your streak.";
+      document.getElementById('today-status-text').innerText = 'Pending ⏳';
+      document.getElementById('today-status-text').style.color = 'var(--color-med)';
+      renderWeekStrip(0, false);
       const squadCode = document.getElementById('squad-room-code').innerText;
       await renderSquad(squadCode, 0, 0, 0);
       alert('Streak and XP reset to 0!');
@@ -411,35 +489,46 @@ function setupEventListeners() {
     bar.style.width = '15%';
 
     try {
+      let easyCount = 0;
+      let medCount = 0;
+      let hardCount = 0;
+
       const acceptedSubs = await LeetCodeAPI.fetchAllAcceptedSubmissions((count, sub) => {
-        msg.innerText = `Found ${count} accepted problems (${sub.title})...`;
-        bar.style.width = `${Math.min(95, count)}%`;
+        msg.innerText = `Scanning: ${count} problems (${sub.title})...`;
+        bar.style.width = `${Math.min(90, count)}%`;
       });
 
-      // Save user's solved slugs to mark roadmap problems automatically!
-      acceptedSubs.forEach(s => userSolvedSlugs.add(s.titleSlug));
-      await chrome.storage.local.set({ user_solved_slugs: Array.from(userSolvedSlugs) });
+      // Query question details to map solved slugs & difficulty breakdown
+      acceptedSubs.forEach(s => {
+        userSolvedSlugs.add(s.titleSlug);
+      });
+
+      // Sample difficulty distribution from dataset matching
+      if (currentRoadmapData.length > 0) {
+        currentRoadmapData.forEach(p => {
+          if (userSolvedSlugs.has(p.slug)) {
+            if (p.difficulty === 'Easy') easyCount++;
+            else if (p.difficulty === 'Medium') medCount++;
+            else if (p.difficulty === 'Hard') hardCount++;
+          }
+        });
+      }
+
+      await chrome.storage.local.set({
+        user_solved_slugs: Array.from(userSolvedSlugs),
+        solved_easy_count: easyCount,
+        solved_med_count: medCount,
+        solved_hard_count: hardCount,
+      });
+
+      renderDonutDistribution(easyCount, medCount, hardCount);
+      renderRoadmapList('all');
 
       bar.style.width = '100%';
-      msg.innerText = `✓ Found ${acceptedSubs.length} problems! Solutions mapped to roadmap.`;
-      renderRoadmapList('all');
+      msg.innerText = `✓ Synced ${acceptedSubs.length} solutions to roadmap!`;
     } catch (err) {
       msg.innerText = `Notice: Please log in to leetcode.com in this browser.`;
     }
-  });
-
-  // 1-Click GitHub OAuth
-  document.getElementById('btn-github-oauth')?.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ type: 'GITHUB_OAUTH_LOGIN' }, (res) => {
-      const statusEl = document.getElementById('auth-status-msg');
-      if (res && res.success) {
-        statusEl.innerText = '✓ Signed in with GitHub!';
-        statusEl.style.color = 'var(--color-green-text)';
-      } else {
-        statusEl.innerText = res?.error || 'OAuth window closed. You can use manual PAT below.';
-        statusEl.style.color = 'var(--color-amber)';
-      }
-    });
   });
 
   // Save Settings
@@ -468,19 +557,16 @@ function setupEventListeners() {
       }
     }
 
-    const firebaseProject = document.getElementById('input-firebase-project').value.trim() || 'leetsync-squads-app';
-
     await chrome.storage.local.set({
       display_name: displayName,
       github_token: token,
       github_repo_owner: repoOwner,
       github_repo_name: repoName || 'leetcode-submissions',
       github_branch: branch,
-      firebase_project_id: firebaseProject,
     });
 
-    statusEl.innerText = `✓ Settings saved! Display name set to @${displayName}`;
-    statusEl.style.color = 'var(--color-green-text)';
+    statusEl.innerText = `✓ Saved! Display name: @${displayName}`;
+    statusEl.style.color = 'var(--color-easy)';
     await loadStoredState();
   });
 
@@ -531,7 +617,7 @@ function setupEventListeners() {
     }
 
     document.getElementById('active-duel-box').style.display = 'flex';
-    document.querySelector('.duel-setup').style.display = 'none';
+    document.querySelector('.duel-setup-form').style.display = 'none';
     document.getElementById('active-duel-problem-title').innerText = prob.title;
     document.getElementById('active-duel-link').href = `https://leetcode.com/problems/${prob.slug}/`;
 
@@ -551,7 +637,7 @@ function setupEventListeners() {
   document.getElementById('btn-cancel-duel')?.addEventListener('click', () => {
     if (window.duelInterval) clearInterval(window.duelInterval);
     document.getElementById('active-duel-box').style.display = 'none';
-    document.querySelector('.duel-setup').style.display = 'flex';
+    document.querySelector('.duel-setup-form').style.display = 'flex';
   });
 }
 

@@ -18,11 +18,11 @@
         </div>
       </div>
       <div class="header-badges">
-        <div class="badge-streak" id="badge-streak-container" title="Daily Consecutive Streak">
+        <div class="badge-streak" id="badge-streak-container" title="Daily Streak">
           <span class="streak-flame">🔥</span>
           <span id="header-streak-count">0</span>
         </div>
-        <div class="badge-xp" id="header-xp-badge" title="XP Earned from Solves">
+        <div class="badge-xp" id="header-xp-badge" title="XP Earned">
           <span>XP</span>
           <span id="header-xp-val">0</span>
         </div>
@@ -38,49 +38,104 @@
       <button class="nav-tab" data-tab="settings">Settings</button>
     </nav>
 
-    <!-- Main Content Views -->
+    <!-- Main Content Area -->
     <main class="content-area">
-      <!-- 1. DASHBOARD VIEW -->
+      <!-- 1. STATS / HERO COMMAND CENTER -->
       <section id="view-dashboard" class="tab-view active">
-        <!-- Daily Goal Card -->
-        <div class="card goal-card">
-          <div class="card-header-flex">
-            <span class="card-subtitle">TODAY'S TARGET</span>
-            <span class="status-pill" id="today-status-pill">Pending ⏳</span>
+        <!-- Section 1: Daily Momentum & Weekly Strip -->
+        <div class="momentum-card">
+          <div class="section-header" style="margin-bottom: 0;">
+            <span class="section-eyebrow">TODAY'S MOMENTUM</span>
+            <span class="section-meta" id="today-status-text">Pending ⏳</span>
           </div>
-          <div class="goal-progress-bar-bg">
-            <div class="goal-progress-bar-fill" id="today-progress-bar" style="width: 0%;"></div>
+          <div class="momentum-headline">
+            <div class="momentum-title" id="momentum-streak-title">0 Day Streak</div>
+            <div class="momentum-subtitle" id="momentum-streak-desc">Solve today's challenge to ignite your streak.</div>
           </div>
-          <div class="card-footer-flex">
-            <span id="today-solved-text">0 / 1 Solved</span>
-            <span class="streak-freeze-text">🛡️ Shield: Ready</span>
+
+          <!-- 7-Day Activity Strip -->
+          <div class="week-strip">
+            <div class="week-day"><span class="day-label">M</span><div class="day-dot" id="dot-day-0">✓</div></div>
+            <div class="week-day"><span class="day-label">T</span><div class="day-dot" id="dot-day-1">✓</div></div>
+            <div class="week-day"><span class="day-label">W</span><div class="day-dot" id="dot-day-2">✓</div></div>
+            <div class="week-day"><span class="day-label">T</span><div class="day-dot" id="dot-day-3">✓</div></div>
+            <div class="week-day"><span class="day-label">F</span><div class="day-dot" id="dot-day-4">✓</div></div>
+            <div class="week-day"><span class="day-label">S</span><div class="day-dot" id="dot-day-5">✓</div></div>
+            <div class="week-day"><span class="day-label">S</span><div class="day-dot" id="dot-day-6">✓</div></div>
           </div>
         </div>
 
-        <!-- Daily Problem Launcher -->
-        <div class="card daily-challenge-card" id="daily-challenge-box">
-          <div class="card-subtitle">DAILY CHALLENGE</div>
-          <div class="daily-title" id="daily-problem-title">Loading today's challenge...</div>
-          <div class="daily-meta">
-            <span class="diff-badge" id="daily-diff-badge">Medium</span>
-            <a href="https://leetcode.com/problemset/" target="_blank" class="btn-launch" id="daily-launch-btn">Solve Now ↗</a>
+        <!-- Section 2: Solved Distribution (Donut + Legend) -->
+        <div>
+          <div class="section-header">
+            <span class="section-eyebrow">SOLVED DISTRIBUTION</span>
+            <span class="section-meta" id="total-solved-meta">0 Total</span>
+          </div>
+          <div class="distribution-row">
+            <div class="donut-container">
+              <svg class="donut-svg" viewBox="0 0 40 40">
+                <circle class="donut-bg" cx="20" cy="20" r="15.915" />
+                <circle class="donut-segment-easy" id="donut-easy" cx="20" cy="20" r="15.915" stroke-dasharray="0 100" stroke-dashoffset="0" />
+                <circle class="donut-segment-med" id="donut-med" cx="20" cy="20" r="15.915" stroke-dasharray="0 100" stroke-dashoffset="0" />
+                <circle class="donut-segment-hard" id="donut-hard" cx="20" cy="20" r="15.915" stroke-dasharray="0 100" stroke-dashoffset="0" />
+              </svg>
+              <div class="donut-center-text">
+                <span class="donut-number" id="donut-total-count">0</span>
+                <span class="donut-label">Solved</span>
+              </div>
+            </div>
+
+            <div class="distribution-breakdown">
+              <div class="diff-stat-row">
+                <div class="diff-legend"><span class="diff-dot easy"></span><span>Easy</span></div>
+                <span class="diff-count" id="count-easy">0</span>
+              </div>
+              <div class="diff-stat-row">
+                <div class="diff-legend"><span class="diff-dot med"></span><span>Medium</span></div>
+                <span class="diff-count" id="count-med">0</span>
+              </div>
+              <div class="diff-stat-row">
+                <div class="diff-legend"><span class="diff-dot hard"></span><span>Hard</span></div>
+                <span class="diff-count" id="count-hard">0</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- GitHub Sync Status & 1-Click Backfill -->
-        <div class="card sync-card">
-          <div class="card-header-flex">
-            <span class="card-subtitle">GITHUB SYNC</span>
-            <span class="repo-name-text" id="sync-repo-name">Not Connected</span>
+        <!-- Section 3: Today's Next Action -->
+        <div>
+          <div class="section-header">
+            <span class="section-eyebrow">NEXT UP</span>
+            <span class="section-meta" id="daily-diff-meta">Daily Problem</span>
           </div>
-          <button class="btn-primary" id="btn-backfill-all">
-            <span class="btn-icon">⚡</span>
-            <span>Sync All Historical Problems</span>
+          <div class="next-action-card">
+            <div class="next-action-left">
+              <div class="problem-headline">
+                <a href="https://leetcode.com/problemset/" target="_blank" class="problem-title-text" id="daily-problem-title">Loading today's problem...</a>
+              </div>
+              <div><span class="diff-badge Medium" id="daily-diff-badge">Medium</span></div>
+            </div>
+            <a href="https://leetcode.com/problemset/" target="_blank" class="btn-action-primary" id="daily-launch-btn">Solve →</a>
+          </div>
+        </div>
+
+        <!-- Section 4: GitHub Backup Strip -->
+        <div class="github-strip">
+          <div class="github-strip-header">
+            <div class="github-repo-info">
+              <span class="github-icon">🐙</span>
+              <span class="github-repo-text" id="sync-repo-name">Not Connected</span>
+            </div>
+            <span class="github-status-indicator" id="github-sync-indicator">● Standby</span>
+          </div>
+          <button class="btn-sync-history" id="btn-backfill-all">
+            <span>⚡</span>
+            <span>Sync Historical Solutions</span>
           </button>
-          <div class="backfill-progress-container" id="backfill-progress-box" style="display: none;">
-            <div class="backfill-status-text" id="backfill-status-msg">Backfilling solutions...</div>
-            <div class="goal-progress-bar-bg">
-              <div class="goal-progress-bar-fill" id="backfill-bar" style="width: 0%;"></div>
+          <div class="sync-progress-box" id="backfill-progress-box" style="display: none;">
+            <div class="sync-status-msg" id="backfill-status-msg">Backfilling solutions...</div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="backfill-bar" style="width: 0%;"></div>
             </div>
           </div>
         </div>
@@ -88,31 +143,34 @@
 
       <!-- 2. SQUAD VIEW -->
       <section id="view-squad" class="tab-view">
-        <div class="card squad-code-card">
-          <div class="card-header-flex">
-            <span class="card-subtitle">YOUR SQUAD</span>
+        <div class="squad-room-strip">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="section-eyebrow">YOUR SQUAD</span>
             <span class="squad-code-pill" id="squad-room-code">#ALGO99</span>
           </div>
-          <div class="squad-actions-row">
-            <input type="text" id="input-join-code" placeholder="Enter #CODE to join" class="input-dark">
+          <div class="squad-input-row">
+            <input type="text" id="input-join-code" placeholder="Join #CODE" class="input-light" style="width: 95px;">
             <button class="btn-secondary" id="btn-join-squad">Join</button>
-            <button class="btn-ghost" id="btn-copy-squad" title="Copy code">📋</button>
-            <button class="btn-ghost" id="btn-leave-squad" title="New / Reset Squad">🔄</button>
+            <button class="btn-icon-square" id="btn-copy-squad" title="Copy code">📋</button>
+            <button class="btn-icon-square" id="btn-leave-squad" title="New Room">🔄</button>
           </div>
         </div>
 
-        <!-- Live Squad Leaderboard -->
-        <div class="card leaderboard-card">
-          <div class="card-subtitle">SQUAD LEADERBOARD</div>
-          <div class="leaderboard-list" id="squad-members-list">
+        <div>
+          <div class="section-header">
+            <span class="section-eyebrow">SQUAD LEADERBOARD</span>
+            <span class="section-meta">Live Sync</span>
+          </div>
+          <div class="leaderboard-container" id="squad-members-list">
             <!-- Populated dynamically -->
           </div>
         </div>
 
-        <!-- Live Activity Stream -->
-        <div class="card activity-card">
-          <div class="card-subtitle">REAL-TIME ACTIVITY FEED</div>
-          <div class="activity-list" id="squad-activity-feed">
+        <div>
+          <div class="section-header">
+            <span class="section-eyebrow">REAL-TIME ACTIVITY FEED</span>
+          </div>
+          <div class="activity-feed-box" id="squad-activity-feed">
             <div class="activity-empty">No recent activity. Solve a problem to light up the feed!</div>
           </div>
         </div>
@@ -120,78 +178,83 @@
 
       <!-- 3. DUELS VIEW -->
       <section id="view-duels" class="tab-view">
-        <div class="card duel-lobby-card">
-          <div class="card-subtitle">1v1 PROBLEM DUEL</div>
-          <p class="card-desc">Challenge a squad mate to a live speed race. First to submit an Accepted solution on LeetCode wins.</p>
-          
-          <div class="duel-setup">
+        <div class="duel-card">
+          <div class="section-header" style="margin-bottom: 0;">
+            <span class="section-eyebrow">1V1 PROBLEM RACE</span>
+          </div>
+          <p class="duel-header-desc">Challenge a squad mate to a live speed race. First accepted LeetCode submission wins.</p>
+
+          <div class="duel-setup-form" style="display: flex; flex-direction: column; gap: 12px;">
             <div class="form-group">
               <label class="form-label">Opponent:</label>
-              <select id="duel-opponent-select" class="select-dark">
+              <select id="duel-opponent-select" class="select-light">
                 <option value="">Select a squad mate...</option>
               </select>
             </div>
 
             <div class="form-group">
               <label class="form-label">Problem Format:</label>
-              <select id="duel-problem-select" class="select-dark">
-                <option value="random_blind75">Blind 75 (Random Problem)</option>
+              <select id="duel-problem-select" class="select-light">
+                <option value="random_blind75">Blind 75 · Random Problem</option>
                 <option value="daily">Today's Daily Challenge</option>
-                <option value="random_easy">Speed Sprint (Easy)</option>
-                <option value="random_hard">Boss Fight (Hard)</option>
+                <option value="random_easy">Speed Sprint · Easy</option>
+                <option value="random_hard">Boss Fight · Hard</option>
               </select>
             </div>
 
-            <button class="btn-primary" id="btn-start-duel">Start Duel Match</button>
+            <button class="btn-action-primary" id="btn-start-duel" style="justify-content: center; padding: 9px;">Start Duel Match</button>
           </div>
 
-          <div id="active-duel-box" class="active-duel-box" style="display: none;">
-            <div class="active-duel-header">
-              <span class="active-duel-badge">MATCH IN PROGRESS</span>
-              <span class="active-duel-timer" id="duel-live-timer">00:00</span>
+          <div id="active-duel-box" class="active-duel-hud" style="display: none;">
+            <div class="duel-hud-top">
+              <span class="duel-hud-badge">MATCH IN PROGRESS</span>
+              <span class="duel-hud-timer" id="duel-live-timer">00:00</span>
             </div>
-            <div class="active-duel-title" id="active-duel-problem-title">Two Sum</div>
-            <div class="active-duel-actions">
-              <a href="https://leetcode.com/problems/two-sum/" target="_blank" class="btn-secondary" id="active-duel-link">Open Problem ↗</a>
-              <button class="btn-ghost" id="btn-cancel-duel">Forfeit</button>
+            <div style="font-size: 13px; font-weight: 600;" id="active-duel-problem-title">Two Sum</div>
+            <div style="display: flex; gap: 8px;">
+              <a href="https://leetcode.com/problems/two-sum/" target="_blank" class="btn-secondary" id="active-duel-link" style="flex: 1; text-align: center; text-decoration: none;">Open Problem ↗</a>
+              <button class="btn-secondary" id="btn-cancel-duel">Forfeit</button>
             </div>
           </div>
         </div>
 
-        <!-- Duel Stats -->
-        <div class="card stats-grid-card">
-          <div class="stat-box">
-            <span class="stat-val" id="duel-wins-count">0</span>
-            <span class="stat-lbl">Won</span>
+        <div>
+          <div class="section-header">
+            <span class="section-eyebrow">YOUR RECORD</span>
           </div>
-          <div class="stat-box">
-            <span class="stat-val" id="duel-matches-count">0</span>
-            <span class="stat-lbl">Played</span>
-          </div>
-          <div class="stat-box">
-            <span class="stat-val" id="duel-winrate">0%</span>
-            <span class="stat-lbl">Win Rate</span>
+          <div class="record-strip">
+            <div class="record-stat-box">
+              <span class="record-val" id="duel-wins-count">0</span>
+              <span class="record-lbl">Won</span>
+            </div>
+            <div class="record-stat-box">
+              <span class="record-val" id="duel-matches-count">0</span>
+              <span class="record-lbl">Played</span>
+            </div>
+            <div class="record-stat-box">
+              <span class="record-val" id="duel-winrate">0%</span>
+              <span class="record-lbl">Win Rate</span>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- 4. ROADMAP VIEW -->
       <section id="view-roadmap" class="tab-view">
-        <div class="card roadmap-progress-card">
-          <div class="card-header-flex">
-            <select id="roadmap-type-select" class="select-dark" style="width: auto; padding: 4px 8px; font-weight: 600;">
-              <option value="blind75">Blind 75 Roadmap</option>
-              <option value="neetcode150">NeetCode 150 Roadmap</option>
+        <div class="roadmap-progress-header">
+          <div class="roadmap-top-row">
+            <select id="roadmap-type-select" class="select-light" style="font-weight: 600; width: auto;">
+              <option value="blind75">Blind 75 Roadmap (75)</option>
+              <option value="neetcode150">NeetCode 150 Roadmap (75+)</option>
             </select>
-            <span class="roadmap-pct" id="blind75-pct">0%</span>
+            <span class="section-meta" id="blind75-count">0 / 75 Solved</span>
           </div>
-          <div class="goal-progress-bar-bg" style="margin-top: 6px;">
-            <div class="goal-progress-bar-fill" id="blind75-bar" style="width: 0%;"></div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="blind75-bar" style="width: 0%;"></div>
           </div>
-          <span class="roadmap-count" id="blind75-count" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); margin-top: 4px;">0 / 75 Solved</span>
         </div>
 
-        <div class="roadmap-filter-tabs">
+        <div class="filter-scroll-container">
           <button class="filter-pill active" data-cat="all">All</button>
           <button class="filter-pill" data-cat="Arrays & Hashing">Arrays</button>
           <button class="filter-pill" data-cat="Two Pointers">Pointers</button>
@@ -209,50 +272,46 @@
 
       <!-- 5. SETTINGS VIEW -->
       <section id="view-settings" class="tab-view">
-        <div class="card settings-card">
-          <div class="card-subtitle">USER & SQUAD PROFILE</div>
-          
+        <div class="settings-section">
+          <span class="section-eyebrow">PROFILE & SQUAD HANDLE</span>
           <div class="form-group">
-            <label class="form-label">Display Handle / Username:</label>
-            <input type="text" id="input-display-name" placeholder="NINJA981" value="NINJA981" class="input-dark">
+            <label class="form-label">Squad Display Name:</label>
+            <input type="text" id="input-display-name" placeholder="NINJA981" value="NINJA981" class="input-light">
           </div>
+        </div>
 
-          <div class="divider-text"><span>GITHUB AUTHENTICATION</span></div>
-          
-          <!-- 1-Click OAuth Button -->
-          <button class="btn-github-oauth" id="btn-github-oauth">
-            <span class="gh-icon">🐙</span>
-            <span>1-Click Sign In with GitHub</span>
-          </button>
-
-          <div class="divider-text"><span>OR MANUAL PAT</span></div>
-
+        <div class="settings-section">
+          <span class="section-eyebrow">GITHUB BACKUP SYNC</span>
           <div class="form-group">
             <label class="form-label">Personal Access Token (PAT):</label>
-            <input type="password" id="input-github-token" placeholder="ghp_xxxxxxxxxxxx" class="input-dark">
+            <input type="password" id="input-github-token" placeholder="ghp_xxxxxxxxxxxx" class="input-light">
           </div>
 
           <div class="form-group">
             <label class="form-label">Target Repository:</label>
-            <select id="select-github-repo" class="select-dark">
+            <select id="select-github-repo" class="select-light">
               <option value="">Select a repository...</option>
             </select>
           </div>
 
           <div class="form-group">
             <label class="form-label">Target Branch:</label>
-            <input type="text" id="input-github-branch" value="main" class="input-dark">
+            <input type="text" id="input-github-branch" value="main" class="input-light">
           </div>
+          
+          <button class="btn-action-primary" id="btn-save-settings" style="justify-content: center;">Save Settings</button>
+          <div class="sync-status-msg" id="auth-status-msg" style="text-align: center;"></div>
+        </div>
 
-          <div class="divider-text"><span>LIVE SQUADS DATABASE</span></div>
-
-          <div class="form-group">
-            <label class="form-label">Firebase Project ID:</label>
-            <input type="text" id="input-firebase-project" placeholder="leetsync-squads-app" class="input-dark">
+        <div class="settings-section">
+          <span class="section-eyebrow">DATA MANAGEMENT</span>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 12px; font-weight: 600;">Reset Progress to 0</div>
+              <div style="font-size: 11px; color: var(--text-muted);">Wipes local streak & XP for a fresh start</div>
+            </div>
+            <button class="btn-secondary" id="btn-reset-streak" style="color: var(--color-hard);">Reset to 0</button>
           </div>
-
-          <div style="display: flex; gap: 8px;"><button class="btn-primary" id="btn-save-settings" style="flex: 1;">Save Settings</button><button class="btn-secondary" id="btn-reset-streak" title="Reset Streak & XP to 0">Reset to 0</button></div>
-          <div class="auth-status-msg" id="auth-status-msg"></div>
         </div>
       </section>
     </main>
