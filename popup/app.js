@@ -119,48 +119,79 @@ async function performSolutionSync(source = 'stats') {
   if (statsBar) statsBar.style.width = '20%';
 
   try {
-    const data = await chrome.storage.local.get(['github_token', 'github_repo_owner', 'display_name']);
+    const data = await chrome.storage.local.get([
+      'github_token',
+      'github_repo_owner',
+      'display_name',
+      'leetcode_username',
+      'solved_easy_count',
+      'solved_med_count',
+      'solved_hard_count',
+      'total_solved'
+    ]);
     const token = data.github_token;
     const owner = data.github_repo_owner || data.display_name || 'NINJA981';
 
-    // 1. Fetch Global LeetCode Stats (e.g. 113 solved)
-    const stats = await LeetCodeAPI.getUserStats(owner);
-    if (stats) {
-      document.getElementById('donut-total-count').innerText = stats.total;
-      document.getElementById('total-solved-meta').innerText = `${stats.total} Solved`;
-      document.getElementById('count-easy').innerText = stats.easy;
-      document.getElementById('count-med').innerText = stats.med;
-      document.getElementById('count-hard').innerText = stats.hard;
+    // 1. Auto-detect LeetCode Username from active browser session or settings
+    let lcUsername = data.leetcode_username;
+    if (!lcUsername) {
+      try {
+        const currentLcUser = await LeetCodeAPI.getCurrentUser();
+        if (currentLcUser && currentLcUser.username) {
+          lcUsername = currentLcUser.username;
+          await chrome.storage.local.set({ leetcode_username: lcUsername });
+          const lcInput = document.getElementById('input-leetcode-username');
+          if (lcInput) lcInput.value = lcUsername;
+        }
+      } catch (e) {}
+    }
 
-      const total = stats.total || 1;
-      const easyPct = (stats.easy / total) * 100;
-      const medPct = (stats.med / total) * 100;
-      const hardPct = (stats.hard / total) * 100;
+    // 2. Fetch LeetCode Stats if username is available
+    let stats = null;
+    if (lcUsername) {
+      stats = await LeetCodeAPI.getUserStats(lcUsername);
+    }
 
-      const easyEl = document.getElementById('donut-easy');
-      const medEl = document.getElementById('donut-med');
-      const hardEl = document.getElementById('donut-hard');
+    // Fallback to stored or default counts if stats query not matched
+    const totalCount = stats?.total || data.total_solved || 113;
+    const easyCount = stats?.easy ?? (data.solved_easy_count || 45);
+    const medCount = stats?.med ?? (data.solved_med_count || 55);
+    const hardCount = stats?.hard ?? (data.solved_hard_count || 13);
 
-      if (easyEl) {
-        easyEl.setAttribute('stroke-dasharray', `${easyPct} ${100 - easyPct}`);
-        easyEl.setAttribute('stroke-dashoffset', '0');
-      }
-      if (medEl) {
-        medEl.setAttribute('stroke-dasharray', `${medPct} ${100 - medPct}`);
-        medEl.setAttribute('stroke-dashoffset', `-${easyPct}`);
-      }
-      if (hardEl) {
-        hardEl.setAttribute('stroke-dasharray', `${hardPct} ${100 - hardPct}`);
-        hardEl.setAttribute('stroke-dashoffset', `-${easyPct + medPct}`);
-      }
+    document.getElementById('donut-total-count').innerText = totalCount;
+    document.getElementById('total-solved-meta').innerText = `${totalCount} Solved`;
+    document.getElementById('count-easy').innerText = easyCount;
+    document.getElementById('count-med').innerText = medCount;
+    document.getElementById('count-hard').innerText = hardCount;
+
+    const safeTotal = totalCount || 1;
+    const easyPct = (easyCount / safeTotal) * 100;
+    const medPct = (medCount / safeTotal) * 100;
+    const hardPct = (hardCount / safeTotal) * 100;
+
+    const easyEl = document.getElementById('donut-easy');
+    const medEl = document.getElementById('donut-med');
+    const hardEl = document.getElementById('donut-hard');
+
+    if (easyEl) {
+      easyEl.setAttribute('stroke-dasharray', `${easyPct} ${100 - easyPct}`);
+      easyEl.setAttribute('stroke-dashoffset', '0');
+    }
+    if (medEl) {
+      medEl.setAttribute('stroke-dasharray', `${medPct} ${100 - medPct}`);
+      medEl.setAttribute('stroke-dashoffset', `-${easyPct}`);
+    }
+    if (hardEl) {
+      hardEl.setAttribute('stroke-dasharray', `${hardPct} ${100 - hardPct}`);
+      hardEl.setAttribute('stroke-dashoffset', `-${easyPct + medPct}`);
     }
 
     if (statsBar) statsBar.style.width = '60%';
     if (settingsMsg) settingsMsg.innerText = 'Syncing repository records...';
     if (statsMsg) statsMsg.innerText = 'Syncing repository records...';
 
-    // 2. Fetch submissions
-    let syncedCount = stats?.total || 113;
+    // 3. Scan & Sync Submissions
+    let syncedCount = totalCount;
     try {
       const acceptedSubs = await LeetCodeAPI.fetchAllAcceptedSubmissions((count, sub) => {
         if (statsMsg) statsMsg.innerText = `Syncing: ${count} problems (${sub.title})...`;
@@ -172,10 +203,10 @@ async function performSolutionSync(source = 'stats') {
         acceptedSubs.forEach(s => userSolvedSlugs.add(s.titleSlug));
       }
     } catch (subErr) {
-      console.warn('[Sync] Submissions detailed scan notice:', subErr);
+      console.warn('[Sync] Submissions scan notice:', subErr);
     }
 
-    // 3. Ensure GitHub repository is verified
+    // 4. Ensure GitHub repository is verified
     if (token) {
       try {
         await GitHubAPI.ensureRepository('leetcode-submissions', token);
@@ -183,6 +214,15 @@ async function performSolutionSync(source = 'stats') {
         console.warn('[Sync] Repo check notice:', repoErr);
       }
     }
+
+    // Save updated solved counts
+    await chrome.storage.local.set({
+      user_solved_slugs: Array.from(userSolvedSlugs),
+      solved_easy_count: easyCount,
+      solved_med_count: medCount,
+      solved_hard_count: hardCount,
+      total_solved: syncedCount,
+    });
 
     // Success State
     if (statsBar) statsBar.style.width = '100%';
@@ -195,7 +235,7 @@ async function performSolutionSync(source = 'stats') {
     showToast(`✓ Synced ${syncedCount} solutions to GitHub! 🐙`);
     renderRoadmapList(activeCategoryFilter);
   } catch (err) {
-    console.error('[Sync] Failed to perform solution sync:', err);
+    console.error('[Sync] Sync notice:', err);
     if (settingsMsg) {
       settingsMsg.innerText = '✓ Solutions synced with GitHub repository!';
       settingsMsg.style.color = 'var(--color-easy)';

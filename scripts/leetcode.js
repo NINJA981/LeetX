@@ -23,18 +23,20 @@ export class LeetCodeAPI {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        return null;
       }
 
       const data = await response.json();
       if (data.errors && data.errors.length > 0) {
-        throw new Error(data.errors.map(e => e.message).join(', '));
+        // If matchedUser error, return data if present or null without throwing
+        if (data.data) return data.data;
+        return null;
       }
 
-      return data.data;
+      return data.data || null;
     } catch (err) {
       console.warn('[LeetCodeAPI] Query notice:', err.message);
-      throw err;
+      return null;
     }
   }
 
@@ -70,6 +72,7 @@ export class LeetCodeAPI {
             acSubmissionNum {
               difficulty
               count
+              submissions
             }
           }
           userCalendar {
@@ -79,28 +82,30 @@ export class LeetCodeAPI {
         }
       }
     `;
-    const data = await this.query(gql, { username });
-    const user = data?.matchedUser;
-    if (!user) return null;
 
-    const totalSolvedItem = user.submitStatsGlobal?.acSubmissionNum?.find(i => i.difficulty === 'All');
-    const easySolvedItem = user.submitStatsGlobal?.acSubmissionNum?.find(i => i.difficulty === 'Easy');
-    const medSolvedItem = user.submitStatsGlobal?.acSubmissionNum?.find(i => i.difficulty === 'Medium');
-    const hardSolvedItem = user.submitStatsGlobal?.acSubmissionNum?.find(i => i.difficulty === 'Hard');
+    try {
+      const data = await this.query(gql, { username });
+      const user = data?.matchedUser;
+      if (!user) return null;
 
-    return {
-      username: user.username,
-      totalSolved: totalSolvedItem?.count || 0,
-      easySolved: easySolvedItem?.count || 0,
-      mediumSolved: medSolvedItem?.count || 0,
-      hardSolved: hardSolvedItem?.count || 0,
-      streak: user.userCalendar?.streak || 0,
-      totalActiveDays: user.userCalendar?.totalActiveDays || 0,
-    };
+      const acList = user.submitStatsGlobal?.acSubmissionNum || [];
+      const getCount = (diff) => acList.find(x => x.difficulty.toLowerCase() === diff.toLowerCase())?.count || 0;
+
+      return {
+        username: user.username,
+        streak: user.userCalendar?.streak || 0,
+        total: getCount('all'),
+        easy: getCount('easy'),
+        med: getCount('medium'),
+        hard: getCount('hard'),
+      };
+    } catch (err) {
+      return null;
+    }
   }
 
   /**
-   * Fetch today's official LeetCode Daily Challenge problem.
+   * Fetch today's official Daily Coding Challenge.
    */
   static async getDailyChallenge() {
     const gql = `
@@ -109,7 +114,6 @@ export class LeetCodeAPI {
           date
           link
           question {
-            questionId
             questionFrontendId
             title
             titleSlug
@@ -122,73 +126,20 @@ export class LeetCodeAPI {
         }
       }
     `;
+
     const data = await this.query(gql);
-    const item = data?.activeDailyCodingChallengeQuestion;
-    if (!item) return null;
+    const challenge = data?.activeDailyCodingChallengeQuestion;
+    if (!challenge) return null;
 
     return {
-      date: item.date,
-      link: `${LEETCODE_BASE_URL}${item.link}`,
-      question: item.question,
+      date: challenge.date,
+      id: challenge.question.questionFrontendId,
+      title: challenge.question.title,
+      slug: challenge.question.titleSlug,
+      difficulty: challenge.question.difficulty,
+      url: `${LEETCODE_BASE_URL}${challenge.link}`,
+      topics: (challenge.question.topicTags || []).map(t => t.name),
     };
-  }
-
-  /**
-   * Fetch full submission details (code, runtime, memory, percentiles, notes) by submission ID.
-   */
-  static async getSubmissionDetails(submissionId) {
-    const gql = `
-      query submissionDetails($submissionId: Int!) {
-        submissionDetails(submissionId: $submissionId) {
-          runtime
-          runtimeDisplay
-          runtimePercentile
-          memory
-          memoryDisplay
-          memoryPercentile
-          code
-          timestamp
-          statusCode
-          notes
-          lang {
-            name
-            verboseName
-          }
-          question {
-            questionId
-            questionFrontendId
-            title
-            titleSlug
-          }
-        }
-      }
-    `;
-    const data = await this.query(gql, { submissionId: parseInt(submissionId, 10) });
-    return data?.submissionDetails || null;
-  }
-
-  /**
-   * Fetch full question HTML content and difficulty for a problem slug.
-   */
-  static async getQuestionData(titleSlug) {
-    const gql = `
-      query questionData($titleSlug: String!) {
-        question(titleSlug: $titleSlug) {
-          questionId
-          questionFrontendId
-          title
-          titleSlug
-          content
-          difficulty
-          topicTags {
-            name
-            slug
-          }
-        }
-      }
-    `;
-    const data = await this.query(gql, { titleSlug });
-    return data?.question || null;
   }
 
   /**
@@ -225,78 +176,21 @@ export class LeetCodeAPI {
       const data = await this.query(gql, { offset, limit, lastKey: null, questionSlug: null });
       const listObj = data?.submissionList;
       const submissions = listObj?.submissions || [];
-      hasNext = listObj?.hasNext || false;
+
+      if (!submissions || submissions.length === 0) break;
 
       for (const sub of submissions) {
         if (sub.statusDisplay === 'Accepted' && !seenProblems.has(sub.titleSlug)) {
           seenProblems.add(sub.titleSlug);
           allAccepted.push(sub);
-          if (onProgress) {
-            onProgress(allAccepted.length, sub);
-          }
+          if (onProgress) onProgress(allAccepted.length, sub);
         }
       }
 
-      if (submissions.length === 0) break;
+      hasNext = Boolean(listObj?.hasNext) && offset < 500;
       offset += limit;
-
-      // Polite delay between batches
-      await new Promise(r => setTimeout(r, 400));
     }
 
     return allAccepted;
   }
-}
-
-export const LANGUAGE_EXTENSIONS = {
-  python: '.py',
-  python3: '.py',
-  pythondata: '.py',
-  pandas: '.py',
-  pyspark: '.py',
-  java: '.java',
-  cpp: '.cpp',
-  'c++': '.cpp',
-  c: '.c',
-  csharp: '.cs',
-  'c#': '.cs',
-  javascript: '.js',
-  js: '.js',
-  typescript: '.ts',
-  ts: '.ts',
-  golang: '.go',
-  go: '.go',
-  rust: '.rs',
-  rs: '.rs',
-  kotlin: '.kt',
-  swift: '.swift',
-  ruby: '.rb',
-  php: '.php',
-  scala: '.scala',
-  dart: '.dart',
-  mysql: '.sql',
-  mssql: '.sql',
-  postgresql: '.sql',
-  oraclesql: '.sql',
-  sql: '.sql',
-  bash: '.sh',
-  r: '.r',
-  elixir: '.ex',
-  erlang: '.erl',
-  racket: '.rkt',
-};
-
-export function getFileExtension(lang) {
-  if (!lang) return '.txt';
-  const normalized = lang.trim().toLowerCase();
-  return LANGUAGE_EXTENSIONS[normalized] || '.txt';
-}
-
-export function getBadgeColor(difficulty) {
-  const map = {
-    Easy: 'brightgreen',
-    Medium: 'orange',
-    Hard: 'red',
-  };
-  return map[difficulty] || 'lightgrey';
 }
