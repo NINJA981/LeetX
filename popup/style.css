@@ -485,20 +485,6 @@ body {
   color: #FFFFFF;
 }
 
-.solved-check-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-easy);
-  color: #FFFFFF;
-  font-size: 8px;
-  font-weight: 800;
-  line-height: 1;
-}
-
 .section-divider {
   height: 1px;
   background: var(--border-subtle);
@@ -1872,10 +1858,16 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-easy);
+  color: #16A34A;
   font-weight: 800;
-  font-size: 12px;
-  margin-left: 2px;
+  font-size: 14px;
+  line-height: 1;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .solved-check-badge {
+  color: #22C55E;
 }
 
 .roadmap-row-right {
@@ -1927,73 +1919,6 @@ body {
 
 .roadmap-action-btn:hover {
   background: var(--bg-muted);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
-}
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-  cursor: pointer;
-}
-
-.roadmap-prob-id {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  flex-shrink: 0;
-  width: 32px;
-}
-
-.roadmap-prob-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: color 0.12s ease;
-}
-
-.roadmap-prob-title-wrap:hover .roadmap-prob-title {
-  color: var(--accent-blue);
-  text-decoration: underline;
-}
-
-.roadmap-problem-row.is-solved .roadmap-prob-title {
-  color: var(--text-secondary);
-}
-
-.roadmap-row-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.roadmap-action-btn {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #FFFFFF;
-  border: 1px solid var(--border-main);
-  border-radius: 5px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  text-decoration: none;
-  font-size: 11px;
-  padding: 0;
-  transition: all 0.12s ease;
-}
-
-.roadmap-action-btn:hover {
-  background: var(--bg-muted);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
-}
-
 .roadmap-empty-state {
   display: flex;
   flex-direction: column;

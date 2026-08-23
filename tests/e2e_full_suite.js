@@ -335,13 +335,14 @@ async function main() {
     const squad = await FirebaseSquads.fetchRemoteSquad(testRoomCode);
     const initialChallengeId = squad.challenge.id;
     const cat = squad.challenge.category || 'Arrays';
+    const targetDiff = (squad.challenge.difficulty && squad.challenge.difficulty !== 'All') ? squad.challenge.difficulty : 'Medium';
 
     for (let i = 0; i < squad.challenge.target; i++) {
       await FirebaseSquads.broadcastSolve(testRoomCode, 'Charlie_Coder', {
         id: 100 + i,
         title: `Solve ${i}`,
         category: cat,
-        difficulty: 'Medium'
+        difficulty: targetDiff
       }, 2);
     }
     const cycledSquad = await FirebaseSquads.fetchRemoteSquad(testRoomCode);
