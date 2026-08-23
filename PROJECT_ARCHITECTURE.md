@@ -340,8 +340,8 @@ flowchart TD
     I --> J
     
     J --> K{today_solved > 0?}
-    K -->|Yes| L[Toolbar Badge: Green '✓5']
-    K -->|No| M[Toolbar Badge: Amber '5']
+    K -->|Yes| L[Toolbar Badge: Neon Pink '#FF2D8B' '✓5']
+    K -->|No| M[Toolbar Badge: Flame Orange '#FF5A1F' '5']
 ```
 
 ---

@@ -468,10 +468,11 @@ body {
 }
 
 .day-circle.done {
-  background: var(--color-easy);
-  border-color: var(--color-easy);
+  background: #FF2D8B;
+  border-color: #FF2D8B;
   color: #FFFFFF;
   font-weight: 700;
+  box-shadow: 0 0 8px rgba(255, 45, 139, 0.4);
 }
 
 .day-circle.today-ring {
@@ -480,9 +481,25 @@ body {
 }
 
 .day-circle.today-ring.done {
-  background: var(--color-easy);
-  border-color: var(--color-easy);
+  background: #FF2D8B;
+  border-color: #FF2D8B;
   color: #FFFFFF;
+  box-shadow: 0 0 8px rgba(255, 45, 139, 0.5);
+}
+
+.solved-check-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #FF2D8B;
+  color: #FFFFFF;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 6px rgba(255, 45, 139, 0.35);
 }
 
 .section-divider {

@@ -148,8 +148,11 @@ function updateToolbarBadge(streak, todaySolved) {
   const text = streak > 0 ? (todaySolved > 0 ? `✓${streak}` : `${streak}`) : '';
   chrome.action.setBadgeText({ text });
   chrome.action.setBadgeBackgroundColor({
-    color: todaySolved > 0 ? '#10B981' : '#F59E0B',
+    color: todaySolved > 0 ? '#FF2D8B' : '#FF5A1F',
   });
+  if (chrome.action.setBadgeTextColor) {
+    chrome.action.setBadgeTextColor({ color: '#FFFFFF' });
+  }
 }
 
 // Listen for messages from content scripts and popup
