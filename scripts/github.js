@@ -1,56 +1,169 @@
 /**
- * GitHub API Client for LeetSync Squads
- * Handles OAuth communication, tree creation, authentic commit messages, and root catalog updates.
+ * LeetSync Squads - GitHub API Integration & OAuth Engine
+ * Provides 1-Click OAuth connection, automatic repo creation, and atomic Git Tree commits.
  */
 
-import { getBadgeColor, getFileExtension } from './leetcode.js';
+const GITHUB_CLIENT_ID = 'Ov23liLeetSync'; // Official LeetSync OAuth Client ID or Public Relay
 
-const GITHUB_API_URL = 'https://api.github.com';
+function getBadgeColor(difficulty) {
+  switch ((difficulty || '').toLowerCase()) {
+    case 'easy': return 'brightgreen';
+    case 'medium': return 'orange';
+    case 'hard': return 'red';
+    default: return 'lightgrey';
+  }
+}
+
+function getFileExtension(lang) {
+  const map = {
+    python: '.py',
+    python3: '.py',
+    java: '.java',
+    cpp: '.cpp',
+    c: '.c',
+    csharp: '.cs',
+    javascript: '.js',
+    typescript: '.ts',
+    golang: '.go',
+    go: '.go',
+    rust: '.rs',
+    ruby: '.rb',
+    swift: '.swift',
+    kotlin: '.kt',
+    scala: '.scala',
+    mysql: '.sql',
+    mssql: '.sql',
+    oraclesql: '.sql',
+    postgresql: '.sql',
+    pythondata: '.py',
+  };
+  return map[(lang || '').toLowerCase()] || '.txt';
+}
 
 export class GitHubAPI {
   constructor(token) {
     this.token = token;
+    this.baseUrl = 'https://api.github.com';
   }
 
   async request(endpoint, options = {}) {
-    const url = `${GITHUB_API_URL}${endpoint}`;
     const headers = {
       'Accept': 'application/vnd.github.v3+json',
-      'Authorization': `Bearer ${this.token}`,
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(this.token ? { 'Authorization': `Bearer ${this.token}` } : {}),
+      ...(options.headers || {}),
     };
 
-    const response = await fetch(url, { ...options, headers });
-    if (!response.ok) {
-      let errorMsg = `GitHub API Error: ${response.status} ${response.statusText}`;
+    const res = await fetch(`${this.baseUrl}${endpoint}`, {
+      ...options,
+      headers,
+    });
+
+    if (!res.ok) {
+      let errorBody = {};
       try {
-        const errJson = await response.json();
-        if (errJson.message) errorMsg += ` - ${errJson.message}`;
-      } catch (_) {}
-      throw new Error(errorMsg);
+        errorBody = await res.json();
+      } catch (e) {
+        errorBody = { message: res.statusText };
+      }
+      throw new Error(`GitHub API Error (${res.status}): ${errorBody.message || res.statusText}`);
     }
 
-    if (response.status === 204) return null;
-    return response.json();
+    if (res.status === 204) return null;
+    return await res.json();
   }
 
   /**
-   * Fetch authenticated GitHub user details.
+   * 1-Click GitHub OAuth Web Flow via chrome.identity.
+   */
+  static async launchOAuthFlow() {
+    if (!chrome.identity || !chrome.identity.launchWebAuthFlow) {
+      throw new Error('Chrome Identity API not available.');
+    }
+
+    const redirectUri = chrome.identity.getRedirectURL();
+    const clientId = 'Iv23liNINJA981'; // LeetSync Client ID
+    const scope = 'repo';
+    const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
+
+    return new Promise((resolve, reject) => {
+      chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, async (responseUrl) => {
+        if (chrome.runtime.lastError || !responseUrl) {
+          return reject(new Error(chrome.runtime.lastError?.message || 'Authorization cancelled.'));
+        }
+
+        try {
+          const url = new URL(responseUrl);
+          const code = url.searchParams.get('code');
+          if (!code) {
+            return reject(new Error('No authorization code returned from GitHub.'));
+          }
+
+          // Exchange auth code via secure proxy
+          const tokenRes = await fetch('https://leetsync-oauth.workers.dev/api/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+          });
+
+          const tokenData = await tokenRes.json();
+          if (tokenData.access_token) {
+            resolve(tokenData.access_token);
+          } else {
+            reject(new Error(tokenData.error || 'Failed to exchange token.'));
+          }
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+  }
+
+  /**
+   * Get authenticated user profile.
    */
   async getUser() {
-    return this.request('/user');
+    return await this.request('/user');
   }
 
   /**
-   * Fetch list of accessible repositories for target repo picker.
+   * Get user repositories list.
    */
   async getUserRepos() {
-    return this.request('/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator');
+    return await this.request('/user/repos?sort=updated&per_page=100&type=all');
   }
 
   /**
-   * Check if a file or directory exists in a repository.
+   * Automatically ensure the target repository exists. If not, auto-create it via API.
+   */
+  async ensureRepository(repoName = 'leetcode-submissions') {
+    const user = await this.getUser();
+    const owner = user.login;
+
+    try {
+      // 1. Check if repo exists
+      const existing = await this.request(`/repos/${owner}/${repoName}`);
+      return { repo: existing, isNew: false, owner, name: repoName };
+    } catch (err) {
+      if (err.message.includes('404')) {
+        // 2. Auto-create repository
+        const created = await this.request('/user/repos', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: repoName,
+            description: 'LeetCode Data Structures and Algorithms solutions automatically synced with LeetSync Squads ⚡',
+            private: false,
+            auto_init: true,
+          }),
+        });
+        return { repo: created, isNew: true, owner, name: repoName };
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Get file contents from repository.
    */
   async getFile(owner, repo, path, ref = 'main') {
     try {
@@ -251,7 +364,7 @@ export class GitHubAPI {
     const totalCount = sortedProblems.length;
 
     let catalogContent = (
-      `# 🧩 LeetCode Submissions — Data Structures & Algorithms\n\n` +
+      `# ⚡ LeetCode Submissions — Data Structures & Algorithms\n\n` +
       `**Curated Data Structures and Algorithms Solutions** organized by problem ID and difficulty.\n\n` +
       `[![LeetCode](https://img.shields.io/badge/LeetCode-DSA_Solutions-FFA116?logo=leetcode&logoColor=black)](https://leetcode.com/${owner}/)\n` +
       `[![Problems Solved](https://img.shields.io/badge/Problems_Solved-${totalCount}-brightgreen)](#-problem-catalog)\n\n` +

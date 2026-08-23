@@ -1,7 +1,6 @@
 /**
  * LeetSync Squads - Coding Progress Companion Engine
- * Accurately tracks all 113+ global LeetCode solves in Your Progress,
- * while tracking specific roadmap completion (e.g. 28/75 in Blind 75).
+ * 1-Click GitHub OAuth & Automatic leetcode-submissions repository provisioning.
  */
 
 import { LeetCodeAPI } from '../scripts/leetcode.js';
@@ -153,17 +152,32 @@ async function loadStoredState() {
   const hard = data.solved_hard_count || 0;
   renderDonutDistribution(easy, med, hard);
 
-  // GitHub Repo
+  // GitHub Connection State
   const repoNameEl = document.getElementById('sync-repo-name');
   const indicator = document.getElementById('github-sync-indicator');
-  if (data.github_repo_owner && data.github_repo_name) {
+  const disconnectedBox = document.getElementById('github-disconnected-box');
+  const connectedBox = document.getElementById('github-connected-box');
+  const oauthBtnText = document.getElementById('btn-oauth-github-text');
+  const disconnectBtn = document.getElementById('btn-disconnect-github');
+
+  if (data.github_token && data.github_repo_owner && data.github_repo_name) {
     repoNameEl.innerText = `${data.github_repo_owner}/${data.github_repo_name}`;
     indicator.innerText = '● Connected';
     indicator.style.color = 'var(--color-easy)';
+    if (disconnectedBox) disconnectedBox.style.display = 'none';
+    if (connectedBox) connectedBox.style.display = 'block';
+
+    if (oauthBtnText) oauthBtnText.innerText = `Connected as @${data.github_repo_owner}`;
+    if (disconnectBtn) disconnectBtn.style.display = 'inline-block';
   } else {
     repoNameEl.innerText = 'Not Connected';
     indicator.innerText = '● Standby';
     indicator.style.color = 'var(--text-muted)';
+    if (disconnectedBox) disconnectedBox.style.display = 'block';
+    if (connectedBox) connectedBox.style.display = 'none';
+
+    if (oauthBtnText) oauthBtnText.innerText = 'Connect with GitHub';
+    if (disconnectBtn) disconnectBtn.style.display = 'none';
   }
 
   // Settings inputs
@@ -533,9 +547,73 @@ async function renderSquad(squadCode, currentStreak = 0, currentTodaySolved = 0,
 }
 
 /**
+ * Handle 1-Click GitHub Connection with Auto-Repository Creation.
+ */
+async function handleConnectGitHub() {
+  const statusEl = document.getElementById('auth-status-msg');
+  if (statusEl) statusEl.innerText = 'Connecting to GitHub...';
+
+  try {
+    let token = null;
+    try {
+      token = await GitHubAPI.launchOAuthFlow();
+    } catch (e) {
+      // Fallback: Prompt token if OAuth proxy is offline
+      token = prompt('Enter your GitHub Personal Access Token:');
+    }
+
+    if (!token || !token.trim()) {
+      if (statusEl) statusEl.innerText = '';
+      return;
+    }
+
+    token = token.trim();
+    if (statusEl) statusEl.innerText = 'Setting up leetcode-submissions repository...';
+
+    const gh = new GitHubAPI(token);
+    const { repo, isNew, owner } = await gh.ensureRepository('leetcode-submissions');
+
+    await chrome.storage.local.set({
+      github_token: token,
+      github_repo_owner: owner,
+      github_repo_name: 'leetcode-submissions',
+      github_branch: 'main',
+      display_name: owner,
+    });
+
+    showToast(`✓ Connected to ${owner}/leetcode-submissions!`);
+    if (statusEl) {
+      statusEl.innerText = `✓ Connected to ${owner}/leetcode-submissions (${isNew ? 'Created new' : 'Linked existing'})`;
+      statusEl.style.color = 'var(--color-easy)';
+    }
+
+    await loadStoredState();
+  } catch (err) {
+    console.error('GitHub connection error:', err);
+    if (statusEl) {
+      statusEl.innerText = `Notice: ${err.message}`;
+      statusEl.style.color = 'var(--color-hard)';
+    }
+  }
+}
+
+/**
  * Setup Event Listeners for buttons and forms.
  */
 function setupEventListeners() {
+  // 1-Click Connect GitHub Buttons
+  document.getElementById('btn-oauth-github')?.addEventListener('click', handleConnectGitHub);
+  document.getElementById('btn-quick-connect-github')?.addEventListener('click', handleConnectGitHub);
+
+  // Disconnect GitHub Button
+  document.getElementById('btn-disconnect-github')?.addEventListener('click', async () => {
+    if (confirm('Disconnect GitHub account from LeetSync?')) {
+      await chrome.storage.local.remove(['github_token', 'github_repo_owner', 'github_repo_name']);
+      showToast('GitHub disconnected');
+      await loadStoredState();
+    }
+  });
+
   // Roadmap Selector Dropdown
   document.getElementById('roadmap-type-select')?.addEventListener('change', (e) => {
     loadRoadmap(e.target.value);
