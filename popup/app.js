@@ -611,6 +611,18 @@ async function handleLinkToken(token) {
  * Setup Event Listeners for buttons and forms.
  */
 function setupEventListeners() {
+  // Notification Toggle Preference
+  const notifToggle = document.getElementById('toggle-notifications');
+  if (notifToggle) {
+    chrome.storage.local.get(['notifications_enabled']).then(data => {
+      notifToggle.checked = data.notifications_enabled !== false;
+    });
+
+    notifToggle.addEventListener('change', async (e) => {
+      await chrome.storage.local.set({ notifications_enabled: e.target.checked });
+      showToast(e.target.checked ? 'Desktop notifications enabled 🔔' : 'Desktop notifications muted 🔕');
+    });
+  }
   // Theme Mode Switcher
   document.querySelectorAll('[data-set-theme]').forEach(btn => {
     btn.addEventListener('click', async (e) => {

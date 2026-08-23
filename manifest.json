@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "LeetSync Squads — Live GitHub Sync & Peer Streaks",
+  "name": "LeetSync Squads \u2014 Live GitHub Sync & Peer Streaks",
   "version": "1.0.0",
   "description": "Instant GitHub sync with authentic metrics, streak gamification, roadmaps, and real-time multiplayer Squad Rooms for LeetCode.",
   "permissions": [
     "storage",
     "alarms",
-    "identity"
+    "identity",
+    "notifications"
   ],
   "host_permissions": [
     "https://leetcode.com/*",

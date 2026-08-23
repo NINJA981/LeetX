@@ -1,3 +1,22 @@
+
+/**
+ * Send Chrome Native Desktop Notification if enabled.
+ */
+async function sendDesktopNotification(title, message, notificationId = null) {
+  const data = await chrome.storage.local.get(['notifications_enabled']);
+  const isEnabled = data.notifications_enabled !== false; // Default true
+
+  if (!isEnabled || !chrome.notifications) return;
+
+  chrome.notifications.create(notificationId || `leetsync_${Date.now()}`, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('assets/icons/icon128.png'),
+    title: title,
+    message: message,
+    priority: 1,
+  });
+}
+
 /**
  * LeetSync Squads - Manifest V3 Background Service Worker
  * Coordinates live streak tracking, problem solves, alarms, and toolbar badge.
