@@ -1,6 +1,7 @@
 /**
  * LeetSync Squads - Coding Progress Companion Engine
- * Intelligence layer: Deterministic recommendations, spaced review queue, personal notes, and squad challenges.
+ * Accurately tracks all 113+ global LeetCode solves in Your Progress,
+ * while tracking specific roadmap completion (e.g. 28/75 in Blind 75).
  */
 
 import { LeetCodeAPI } from '../scripts/leetcode.js';
@@ -84,6 +85,7 @@ async function loadStoredState() {
     'solved_easy_count',
     'solved_med_count',
     'solved_hard_count',
+    'total_solved',
     'duel_wins',
     'duel_played',
   ]);
@@ -145,7 +147,7 @@ async function loadStoredState() {
 
   renderWeekStrip(streak, todaySolved > 0);
 
-  // Solved Distribution Donut
+  // Global Solved Distribution Donut across all LeetCode
   const easy = data.solved_easy_count || 0;
   const med = data.solved_med_count || 0;
   const hard = data.solved_hard_count || 0;
@@ -250,13 +252,28 @@ function renderDonutDistribution(easy = 0, med = 0, hard = 0) {
 }
 
 /**
- * Validate live LeetCode session.
+ * Fetch and sync authentic user solved counts directly from active LeetCode session.
  */
 async function syncLiveLeetCodeSession() {
   try {
     const userStatus = await LeetCodeAPI.getCurrentUser();
-    if (userStatus && userStatus.isSignedIn) {
-      console.log('[LeetSync] Active LeetCode session verified.');
+    if (userStatus && userStatus.isSignedIn && userStatus.username) {
+      const stats = await LeetCodeAPI.getUserStats(userStatus.username);
+      if (stats) {
+        const easy = stats.easySolved || 0;
+        const med = stats.mediumSolved || 0;
+        const hard = stats.hardSolved || 0;
+        const total = stats.totalSolved || (easy + med + hard);
+
+        await chrome.storage.local.set({
+          solved_easy_count: easy,
+          solved_med_count: med,
+          solved_hard_count: hard,
+          total_solved: total,
+        });
+
+        renderDonutDistribution(easy, med, hard);
+      }
     }
   } catch (err) {
     console.warn('[Popup] LeetCode session check notice:', err.message);
@@ -601,7 +618,7 @@ function setupEventListeners() {
     }
   });
 
-  // 1-Click Backfill Button
+  // 1-Click Backfill Button: Syncs full 113+ LeetCode problems & authentic difficulty breakdown
   document.getElementById('btn-backfill-all')?.addEventListener('click', async () => {
     const box = document.getElementById('backfill-progress-box');
     const msg = document.getElementById('backfill-status-msg');
@@ -612,10 +629,7 @@ function setupEventListeners() {
     bar.style.width = '15%';
 
     try {
-      let easyCount = 0;
-      let medCount = 0;
-      let hardCount = 0;
-
+      // 1. Fetch all accepted submission slugs
       const acceptedSubs = await LeetCodeAPI.fetchAllAcceptedSubmissions((count, sub) => {
         msg.innerText = `Scanning: ${count} problems (${sub.title})...`;
         bar.style.width = `${Math.min(90, count)}%`;
@@ -625,14 +639,21 @@ function setupEventListeners() {
         userSolvedSlugs.add(s.titleSlug);
       });
 
-      if (currentRoadmapData.length > 0) {
-        currentRoadmapData.forEach(p => {
-          if (userSolvedSlugs.has(p.slug)) {
-            if (p.difficulty === 'Easy') easyCount++;
-            else if (p.difficulty === 'Medium') medCount++;
-            else if (p.difficulty === 'Hard') hardCount++;
-          }
-        });
+      // 2. Fetch full global account stats (e.g. 113 total, 27 easy, 82 med, 10 hard)
+      let easyCount = 0;
+      let medCount = 0;
+      let hardCount = 0;
+      let totalCount = acceptedSubs.length;
+
+      const userStatus = await LeetCodeAPI.getCurrentUser();
+      if (userStatus && userStatus.username) {
+        const stats = await LeetCodeAPI.getUserStats(userStatus.username);
+        if (stats) {
+          easyCount = stats.easySolved || 0;
+          medCount = stats.mediumSolved || 0;
+          hardCount = stats.hardSolved || 0;
+          totalCount = stats.totalSolved || totalCount;
+        }
       }
 
       await chrome.storage.local.set({
@@ -640,6 +661,7 @@ function setupEventListeners() {
         solved_easy_count: easyCount,
         solved_med_count: medCount,
         solved_hard_count: hardCount,
+        total_solved: totalCount,
       });
 
       renderDonutDistribution(easyCount, medCount, hardCount);
@@ -647,8 +669,8 @@ function setupEventListeners() {
       updateNextRecommendation();
 
       bar.style.width = '100%';
-      msg.innerText = `✓ Synced ${acceptedSubs.length} solutions to roadmap!`;
-      showToast(`✓ Synced ${acceptedSubs.length} solutions!`);
+      msg.innerText = `✓ Synced all ${totalCount} solutions to progress & roadmap!`;
+      showToast(`✓ Synced all ${totalCount} solutions!`);
     } catch (err) {
       msg.innerText = `Notice: Please log in to leetcode.com in this browser.`;
     }
