@@ -464,14 +464,15 @@
         <!-- APPEARANCE & THEME SWITCHER -->
         <div class="settings-group-card">
           <span class="section-label">APPEARANCE</span>
-          <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
             <div>
               <div style="font-size: 12px; font-weight: 600;">Theme Mode</div>
-              <div style="font-size: 11px; color: var(--text-muted);">Choose light or eye-friendly dark mode</div>
+              <div style="font-size: 11px; color: var(--text-muted);">Choose light, dark, or LeetX neon</div>
             </div>
-            <div class="roadmap-segmented-wrap" style="padding: 2px; width: 140px;">
-              <button class="roadmap-segment-btn active" id="theme-btn-light" data-set-theme="light" style="padding: 4px 0; font-size: 11px;">☀️ Light</button>
-              <button class="roadmap-segment-btn" id="theme-btn-dark" data-set-theme="dark" style="padding: 4px 0; font-size: 11px;">🌙 Dark</button>
+            <div class="theme-segmented-wrap">
+              <button class="theme-segment-btn active" id="theme-btn-light" data-set-theme="light">☀ Light</button>
+              <button class="theme-segment-btn" id="theme-btn-dark" data-set-theme="dark">◐ Dark</button>
+              <button class="theme-segment-btn theme-btn-leetx" id="theme-btn-leetx" data-set-theme="leetx">⚡ LeetX</button>
             </div>
           </div>
         </div>

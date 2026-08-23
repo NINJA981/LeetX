@@ -1858,16 +1858,10 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #16A34A;
+  color: var(--color-easy);
   font-weight: 800;
-  font-size: 14px;
-  line-height: 1;
-  margin-left: 4px;
-  flex-shrink: 0;
-}
-
-[data-theme="dark"] .solved-check-badge {
-  color: #22C55E;
+  font-size: 12px;
+  margin-left: 2px;
 }
 
 .roadmap-row-right {
@@ -1919,6 +1913,73 @@ body {
 
 .roadmap-action-btn:hover {
   background: var(--bg-muted);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.roadmap-prob-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 32px;
+}
+
+.roadmap-prob-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.12s ease;
+}
+
+.roadmap-prob-title-wrap:hover .roadmap-prob-title {
+  color: var(--accent-blue);
+  text-decoration: underline;
+}
+
+.roadmap-problem-row.is-solved .roadmap-prob-title {
+  color: var(--text-secondary);
+}
+
+.roadmap-row-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.roadmap-action-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFFFF;
+  border: 1px solid var(--border-main);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 11px;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+
+.roadmap-action-btn:hover {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
 .roadmap-empty-state {
   display: flex;
   flex-direction: column;
@@ -2621,5 +2682,445 @@ body[data-theme="dark"] {
   border-color: rgba(239, 68, 68, 0.3);
   background: rgba(239, 68, 68, 0.08);
 }
+
+/* ==========================================
+   THEME MODE SELECTOR
+========================================== */
+.theme-segmented-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-main);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.theme-segment-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 4px 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.theme-segment-btn:hover {
+  color: var(--text-primary);
+}
+
+.theme-segment-btn.active {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  border-color: var(--border-main);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.theme-segment-btn.theme-btn-leetx {
+  position: relative;
+}
+
+.theme-segment-btn.theme-btn-leetx:hover {
+  color: #FF5A1F;
+}
+
+.theme-segment-btn.theme-btn-leetx.active {
+  background: linear-gradient(90deg, #FF5A1F 0%, #FF2D8B 50%, #A020F0 100%);
+  color: #FFFFFF;
+  border-color: transparent;
+  box-shadow: 0 0 12px rgba(255, 45, 139, 0.4);
+}
+
+/* ==========================================
+   THIRD THEME: LEETX NEON (Cyberpunk Gaming)
+========================================== */
+[data-theme="leetx"],
+body[data-theme="leetx"],
+[data-theme="neon"],
+body[data-theme="neon"] {
+  --bg-app: #050509;
+  --bg-subtle: #0A0A14;
+  --bg-muted: #10101F;
+  --bg-hover: #15152A;
+  --bg-active: #1E1E38;
+
+  --border-main: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-strong: rgba(160, 32, 240, 0.35);
+
+  --text-primary: #F4F4FA;
+  --text-secondary: #A0A0B0;
+  --text-muted: #606075;
+
+  --accent-dark: #A020F0;
+  --accent-hover: #B344FF;
+  --accent-blue: #1FB6FF;
+  --accent-pink: #FF2D8B;
+  --accent-orange: #FF5A1F;
+
+  --color-easy: #39FF88;
+  --color-easy-bg: rgba(57, 255, 136, 0.12);
+  --color-med: #FFCC33;
+  --color-med-bg: rgba(255, 204, 51, 0.12);
+  --color-hard: #FF3355;
+  --color-hard-bg: rgba(255, 51, 85, 0.12);
+
+  --grad-energy: linear-gradient(90deg, #FF5A1F 0%, #FF2D8B 50%, #A020F0 100%);
+  --grad-cool: linear-gradient(90deg, #1FB6FF, #39FF88);
+}
+
+[data-theme="leetx"] .brand-icon-box {
+  background: transparent;
+  box-shadow: 0 0 10px rgba(255, 45, 139, 0.35);
+}
+
+[data-theme="leetx"] .brand-name {
+  color: #FFFFFF;
+}
+
+[data-theme="leetx"] .brand-tag {
+  color: #FF2D8B;
+  background: rgba(255, 45, 139, 0.12);
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 45, 139, 0.25);
+}
+
+[data-theme="leetx"] .app-header {
+  background: rgba(5, 5, 9, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="leetx"] .status-capsule {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #F4F4FA;
+}
+
+[data-theme="leetx"] .status-capsule .flame-icon {
+  filter: drop-shadow(0 0 6px rgba(255, 90, 31, 0.6));
+}
+
+[data-theme="leetx"] .nav-tabs {
+  background: #050509;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="leetx"] .nav-tab {
+  color: #A0A0B0;
+}
+
+[data-theme="leetx"] .nav-tab:hover {
+  color: #FFFFFF;
+}
+
+[data-theme="leetx"] .nav-tab.active {
+  color: #FFFFFF;
+  border-bottom: 2px solid #FF2D8B;
+  text-shadow: 0 0 10px rgba(255, 45, 139, 0.5);
+}
+
+[data-theme="leetx"] .onboarding-screen {
+  background: #050509;
+}
+
+[data-theme="leetx"] .onboard-instructions-card {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="leetx"] .step-num-badge {
+  background: linear-gradient(90deg, #FF5A1F 0%, #FF2D8B 50%, #A020F0 100%);
+  color: #FFFFFF;
+}
+
+[data-theme="leetx"] .hero-momentum-block {
+  background: linear-gradient(135deg, rgba(255, 90, 31, 0.06), rgba(160, 32, 240, 0.06)), #0A0A14;
+  border: 1px solid rgba(160, 32, 240, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(160, 32, 240, 0.03);
+}
+
+[data-theme="leetx"] .hero-big-number {
+  color: #FFFFFF;
+  text-shadow: 0 0 18px rgba(255, 90, 31, 0.45);
+}
+
+[data-theme="leetx"] .day-circle {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #A0A0B0;
+}
+
+[data-theme="leetx"] .day-circle.done {
+  background: #39FF88;
+  border-color: #39FF88;
+  color: #050509;
+  box-shadow: 0 0 10px rgba(57, 255, 136, 0.35);
+}
+
+[data-theme="leetx"] .day-circle.today-ring {
+  border-color: #FF2D8B;
+  box-shadow: 0 0 8px rgba(255, 45, 139, 0.4);
+}
+
+[data-theme="leetx"] .github-footer-strip {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="leetx"] .dashboard-stat-card {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="leetx"] .btn-cta-solve {
+  background: linear-gradient(90deg, #FF5A1F 0%, #FF2D8B 50%, #A020F0 100%);
+  color: #FFFFFF;
+  border: none;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 4px 16px -4px rgba(255, 45, 139, 0.5);
+}
+
+[data-theme="leetx"] .btn-cta-solve:hover {
+  background: linear-gradient(90deg, #FF7A3F 0%, #FF4FA3 50%, #B344FF 100%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 6px 22px -2px rgba(255, 45, 139, 0.7);
+}
+
+[data-theme="leetx"] .btn-secondary-flat,
+[data-theme="leetx"] .btn-icon-btn,
+[data-theme="leetx"] .btn-sync-action {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #F4F4FA;
+}
+
+[data-theme="leetx"] .btn-secondary-flat:hover,
+[data-theme="leetx"] .btn-icon-btn:hover,
+[data-theme="leetx"] .btn-sync-action:hover {
+  background: #15152A;
+  border-color: #FF5A1F;
+  color: #FFFFFF;
+}
+
+[data-theme="leetx"] .input-flat,
+[data-theme="leetx"] .select-flat {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #F4F4FA;
+}
+
+[data-theme="leetx"] .input-flat:focus,
+[data-theme="leetx"] .select-flat:focus {
+  border-color: #A020F0;
+  box-shadow: 0 0 0 2px rgba(160, 32, 240, 0.2);
+}
+
+[data-theme="leetx"] .squad-room-panel,
+[data-theme="leetx"] .squad-challenge-module,
+[data-theme="leetx"] .squad-leaderboard-table,
+[data-theme="leetx"] .squad-timeline-container,
+[data-theme="leetx"] .settings-group-card {
+  background: #0A0A14;
+  border: 1px solid rgba(160, 32, 240, 0.22);
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="leetx"] .squad-code-display,
+[data-theme="leetx"] .squad-input-combo {
+  background: #050509;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="leetx"] .squad-code-badge {
+  color: #39FF88;
+  background: rgba(57, 255, 136, 0.1);
+  border: 1px solid rgba(57, 255, 136, 0.25);
+  text-shadow: 0 0 8px rgba(57, 255, 136, 0.3);
+}
+
+[data-theme="leetx"] .squad-btn-primary {
+  background: linear-gradient(90deg, #FF5A1F 0%, #FF2D8B 50%, #A020F0 100%);
+  color: #FFFFFF;
+  box-shadow: 0 4px 16px -4px rgba(255, 45, 139, 0.4);
+}
+
+[data-theme="leetx"] .squad-btn-secondary {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #F4F4FA;
+}
+
+[data-theme="leetx"] .squad-btn-secondary:hover {
+  background: #15152A;
+  border-color: #1FB6FF;
+}
+
+[data-theme="leetx"] .leaderboard-member-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="leetx"] .leaderboard-member-row:hover {
+  background: #0F0F1E;
+}
+
+[data-theme="leetx"] .leaderboard-member-row.is-current {
+  background: rgba(160, 32, 240, 0.08);
+}
+
+[data-theme="leetx"] .lb-you-tag {
+  background: rgba(31, 182, 255, 0.15);
+  color: #1FB6FF;
+  border: 1px solid rgba(31, 182, 255, 0.3);
+}
+
+[data-theme="leetx"] .lb-leader-tag {
+  background: rgba(255, 204, 51, 0.15);
+  color: #FFCC33;
+  border: 1px solid rgba(255, 204, 51, 0.3);
+}
+
+[data-theme="leetx"] .challenge-score-badge {
+  background: #050509;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #A0A0B0;
+}
+
+[data-theme="leetx"] .challenge-score-badge.complete {
+  background: rgba(57, 255, 136, 0.15);
+  color: #39FF88;
+  border: 1px solid rgba(57, 255, 136, 0.3);
+}
+
+[data-theme="leetx"] .challenge-progress-fill {
+  background: linear-gradient(90deg, #FF5A1F 0%, #FF2D8B 50%, #A020F0 100%);
+}
+
+[data-theme="leetx"] .challenge-progress-fill.complete {
+  background: #39FF88;
+}
+
+[data-theme="leetx"] .timeline-event-item {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="leetx"] .squad-solo-hint {
+  background: #050509;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="leetx"] .duel-setup-card,
+[data-theme="leetx"] .duel-active-card,
+[data-theme="leetx"] .incoming-duel-card {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 45, 139, 0.25);
+  box-shadow: 0 8px 24px -8px rgba(255, 45, 139, 0.15);
+}
+
+[data-theme="leetx"] .duel-timer-val {
+  color: #F4F4FA;
+  text-shadow: 0 0 20px rgba(255, 90, 31, 0.5);
+}
+
+[data-theme="leetx"] .duel-vs-text {
+  background: linear-gradient(90deg, #FF5A1F 0%, #FF2D8B 50%, #A020F0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-theme="leetx"] .roadmap-hero-panel {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="leetx"] .roadmap-select-dropdown {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #F4F4FA;
+}
+
+[data-theme="leetx"] .next-rec-card {
+  background: linear-gradient(90deg, rgba(255, 90, 31, 0.08), rgba(255, 45, 139, 0.08)), #0A0A14;
+  border: 1px solid rgba(255, 90, 31, 0.3);
+}
+
+[data-theme="leetx"] .next-rec-title {
+  color: #FF7A3F;
+}
+
+[data-theme="leetx"] .next-rec-sub {
+  color: #A0A0B0;
+}
+
+[data-theme="leetx"] .cat-pill-btn {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #A0A0B0;
+}
+
+[data-theme="leetx"] .cat-pill-btn:hover {
+  color: #F4F4FA;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="leetx"] .cat-pill-btn.active {
+  background: linear-gradient(90deg, #FF5A1F 0%, #FF2D8B 50%, #A020F0 100%);
+  color: #FFFFFF;
+  border-color: transparent;
+  box-shadow: 0 0 12px rgba(255, 45, 139, 0.35);
+}
+
+[data-theme="leetx"] .roadmap-table-container {
+  background: #050509;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="leetx"] .roadmap-problem-row {
+  background: #050509;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="leetx"] .roadmap-problem-row:hover {
+  background: #0A0A14;
+}
+
+[data-theme="leetx"] .diff-tag.Easy {
+  background: rgba(57, 255, 136, 0.12);
+  color: #39FF88;
+}
+
+[data-theme="leetx"] .diff-tag.Medium {
+  background: rgba(255, 204, 51, 0.12);
+  color: #FFCC33;
+}
+
+[data-theme="leetx"] .diff-tag.Hard {
+  background: rgba(255, 51, 85, 0.12);
+  color: #FF3355;
+}
+
+[data-theme="leetx"] .roadmap-action-btn {
+  background: #0A0A14;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #A0A0B0;
+}
+
+[data-theme="leetx"] .roadmap-action-btn:hover {
+  background: #15152A;
+  border-color: #FF2D8B;
+  color: #FFFFFF;
+}
+
+[data-theme="leetx"] .problem-drawer-content {
+  background: #0A0A14;
+  border-top: 1px solid rgba(160, 32, 240, 0.3);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.8);
+}
+
 
 

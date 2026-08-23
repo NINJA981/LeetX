@@ -340,8 +340,8 @@ flowchart TD
     I --> J
     
     J --> K{today_solved > 0?}
-    K -->|Yes| L[Toolbar Badge: Neon Pink '#FF2D8B' '✓5']
-    K -->|No| M[Toolbar Badge: Flame Orange '#FF5A1F' '5']
+    K -->|Yes| L[Toolbar Badge: Green '✓5']
+    K -->|No| M[Toolbar Badge: Amber '5']
 ```
 
 ---
@@ -526,7 +526,7 @@ service cloud.firestore {
 | `incoming_duel` | `object` | `null` | Cached incoming duel invitation document. |
 | `sync_status` | `object` | `{ state: 'idle' }` | Background GitHub sync progress streaming state. |
 | `target_open_tab` | `string` | `null` | Route target set by desktop notification click (`'duels'`). |
-| `theme_preference` | `string` | `'light'` | `'light'` or `'dark'` (Obsidian Slate). |
+| `theme_preference` | `string` | `'light'` | `'light'`, `'dark'` (Obsidian Slate), or `'leetx'` (LeetX Neon Cyberpunk). |
 | `notifications_enabled` | `boolean` | `true` | Master toggle for OS desktop notifications. |
 | `notify_squad_solves_enabled`| `boolean`| `true` | Notification toggle for squad mate solves. |
 | `share_solves_enabled` | `boolean` | `true` | Toggle to broadcast own solves to squad room. |

@@ -1308,7 +1308,8 @@ function setupEventListeners() {
         b.classList.toggle('active', b.dataset.setTheme === theme);
       });
 
-      showToast(`Switched to ${theme === 'dark' ? 'Dark 🌙' : 'Light ☀️'} mode`);
+      const label = theme === 'leetx' ? 'LeetX Neon ⚡' : (theme === 'dark' ? 'Dark 🌙' : 'Light ☀️');
+      showToast(`Switched to ${label} mode`);
     });
   });
 
