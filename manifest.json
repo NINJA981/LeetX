@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "LeetSync Squads — Live GitHub Sync & Peer Streaks",
+  "version": "1.0.0",
+  "description": "Instant GitHub sync with authentic metrics, streak gamification, roadmaps, and real-time multiplayer Squad Rooms for LeetCode.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://leetcode.com/*",
+    "https://api.github.com/*",
+    "https://firestore.googleapis.com/*",
+    "https://*.firebaseio.com/*"
+  ],
+  "background": {
+    "service_worker": "scripts/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_title": "LeetSync Squads",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://leetcode.com/*"
+      ],
+      "js": [
+        "scripts/content.js"
+      ],
+      "css": [
+        "styles/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/*",
+        "styles/*"
+      ],
+      "matches": [
+        "https://leetcode.com/*"
+      ]
+    }
+  ]
+}

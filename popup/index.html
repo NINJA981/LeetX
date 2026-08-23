@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LeetSync Squads</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app-container">
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo-icon">⚡</span>
+        <div class="brand-text">
+          <span class="brand-name">LeetSync</span>
+          <span class="brand-tag">SQUADS</span>
+        </div>
+      </div>
+      <div class="header-badges">
+        <div class="badge-streak" id="badge-streak-container">
+          <span class="streak-flame">🔥</span>
+          <span id="header-streak-count">1</span>
+        </div>
+        <div class="badge-xp" id="header-xp-badge">
+          <span>XP</span>
+          <span id="header-xp-val">120</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="dashboard">Stats</button>
+      <button class="nav-tab" data-tab="squad">Squad</button>
+      <button class="nav-tab" data-tab="duels">Duels</button>
+      <button class="nav-tab" data-tab="roadmap">Roadmap</button>
+      <button class="nav-tab" data-tab="settings">Settings</button>
+    </nav>
+
+    <!-- Main Content Views -->
+    <main class="content-area">
+      <!-- 1. DASHBOARD VIEW -->
+      <section id="view-dashboard" class="tab-view active">
+        <!-- Daily Goal Card -->
+        <div class="card goal-card">
+          <div class="card-header-flex">
+            <span class="card-subtitle">TODAY'S TARGET</span>
+            <span class="status-pill" id="today-status-pill">Pending ⏳</span>
+          </div>
+          <div class="goal-progress-bar-bg">
+            <div class="goal-progress-bar-fill" id="today-progress-bar" style="width: 0%;"></div>
+          </div>
+          <div class="card-footer-flex">
+            <span id="today-solved-text">0 / 1 Solved</span>
+            <span class="streak-freeze-text">🛡️ Shield: Ready</span>
+          </div>
+        </div>
+
+        <!-- Daily Problem Launcher -->
+        <div class="card daily-challenge-card" id="daily-challenge-box">
+          <div class="card-subtitle">DAILY CHALLENGE</div>
+          <div class="daily-title" id="daily-problem-title">Loading today's problem...</div>
+          <div class="daily-meta">
+            <span class="diff-badge" id="daily-diff-badge">Medium</span>
+            <a href="https://leetcode.com/problemset/" target="_blank" class="btn-launch" id="daily-launch-btn">Solve Now ↗</a>
+          </div>
+        </div>
+
+        <!-- GitHub Sync Status & 1-Click Backfill -->
+        <div class="card sync-card">
+          <div class="card-header-flex">
+            <span class="card-subtitle">GITHUB SYNC</span>
+            <span class="repo-name-text" id="sync-repo-name">Not Connected</span>
+          </div>
+          <button class="btn-primary" id="btn-backfill-all">
+            <span class="btn-icon">⚡</span>
+            <span>Sync All Historical Problems</span>
+          </button>
+          <div class="backfill-progress-container" id="backfill-progress-box" style="display: none;">
+            <div class="backfill-status-text" id="backfill-status-msg">Backfilling solutions...</div>
+            <div class="goal-progress-bar-bg">
+              <div class="goal-progress-bar-fill" id="backfill-bar" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. SQUAD VIEW -->
+      <section id="view-squad" class="tab-view">
+        <div class="card squad-code-card">
+          <div class="card-header-flex">
+            <span class="card-subtitle">YOUR SQUAD</span>
+            <span class="squad-code-pill" id="squad-room-code">#ALGO99</span>
+          </div>
+          <div class="squad-actions-row">
+            <input type="text" id="input-join-code" placeholder="Enter #CODE to join" class="input-dark">
+            <button class="btn-secondary" id="btn-join-squad">Join</button>
+            <button class="btn-ghost" id="btn-copy-squad" title="Copy code">📋</button>
+          </div>
+        </div>
+
+        <!-- Live Squad Leaderboard -->
+        <div class="card leaderboard-card">
+          <div class="card-subtitle">SQUAD LEADERBOARD</div>
+          <div class="leaderboard-list" id="squad-members-list">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Live Activity Stream -->
+        <div class="card activity-card">
+          <div class="card-subtitle">REAL-TIME ACTIVITY FEED</div>
+          <div class="activity-list" id="squad-activity-feed">
+            <div class="activity-empty">No recent activity. Solve a problem to light up the feed!</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. DUELS VIEW -->
+      <section id="view-duels" class="tab-view">
+        <div class="card duel-lobby-card">
+          <div class="card-subtitle">1v1 PROBLEM DUEL</div>
+          <p class="card-desc">Challenge a squad mate to a live speed race. First to submit an Accepted solution on LeetCode wins.</p>
+          
+          <div class="duel-setup">
+            <div class="form-group">
+              <label class="form-label">Opponent:</label>
+              <select id="duel-opponent-select" class="select-dark">
+                <option value="">Select a squad mate...</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Problem Format:</label>
+              <select id="duel-problem-select" class="select-dark">
+                <option value="random_blind75">Blind 75 (Random Medium)</option>
+                <option value="daily">Today's Daily Challenge</option>
+                <option value="random_easy">Speed Sprint (Easy)</option>
+                <option value="random_hard">Boss Fight (Hard)</option>
+              </select>
+            </div>
+
+            <button class="btn-primary" id="btn-start-duel">Start Duel Match</button>
+          </div>
+
+          <div id="active-duel-box" class="active-duel-box" style="display: none;">
+            <div class="active-duel-header">
+              <span class="active-duel-badge">MATCH IN PROGRESS</span>
+              <span class="active-duel-timer" id="duel-live-timer">00:00</span>
+            </div>
+            <div class="active-duel-title" id="active-duel-problem-title">347. Top K Frequent Elements</div>
+            <div class="active-duel-actions">
+              <a href="https://leetcode.com/problemset/" target="_blank" class="btn-secondary" id="active-duel-link">Open Problem ↗</a>
+              <button class="btn-ghost" id="btn-cancel-duel">Forfeit</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Duel Stats -->
+        <div class="card stats-grid-card">
+          <div class="stat-box">
+            <span class="stat-val" id="duel-wins-count">0</span>
+            <span class="stat-lbl">Won</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-val" id="duel-matches-count">0</span>
+            <span class="stat-lbl">Played</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-val" id="duel-winrate">0%</span>
+            <span class="stat-lbl">Win Rate</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. ROADMAP VIEW -->
+      <section id="view-roadmap" class="tab-view">
+        <div class="card roadmap-progress-card">
+          <div class="card-header-flex">
+            <span class="card-subtitle">BLIND 75 ROADMAP</span>
+            <span class="roadmap-pct" id="blind75-pct">0%</span>
+          </div>
+          <div class="goal-progress-bar-bg">
+            <div class="goal-progress-bar-fill" id="blind75-bar" style="width: 0%;"></div>
+          </div>
+          <span class="roadmap-count" id="blind75-count">0 / 75 Completed</span>
+        </div>
+
+        <div class="roadmap-filter-tabs">
+          <button class="filter-pill active" data-cat="all">All</button>
+          <button class="filter-pill" data-cat="Arrays & Hashing">Arrays</button>
+          <button class="filter-pill" data-cat="Two Pointers">Pointers</button>
+          <button class="filter-pill" data-cat="Trees">Trees</button>
+          <button class="filter-pill" data-cat="Dynamic Programming">DP</button>
+        </div>
+
+        <div class="roadmap-list" id="roadmap-items-list">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- 5. SETTINGS VIEW -->
+      <section id="view-settings" class="tab-view">
+        <div class="card settings-card">
+          <div class="card-subtitle">GITHUB AUTHENTICATION</div>
+          
+          <!-- 1-Click OAuth Button -->
+          <button class="btn-github-oauth" id="btn-github-oauth">
+            <span class="gh-icon">🐙</span>
+            <span>1-Click Sign In with GitHub</span>
+          </button>
+
+          <div class="divider-text"><span>OR MANUAL PAT</span></div>
+
+          <div class="form-group">
+            <label class="form-label">Personal Access Token (PAT):</label>
+            <input type="password" id="input-github-token" placeholder="ghp_xxxxxxxxxxxx" class="input-dark">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Target Repository:</label>
+            <select id="select-github-repo" class="select-dark">
+              <option value="">Select a repository...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Target Branch:</label>
+            <input type="text" id="input-github-branch" value="main" class="input-dark">
+          </div>
+
+          <div class="divider-text"><span>LIVE SQUADS DATABASE</span></div>
+
+          <div class="form-group">
+            <label class="form-label">Firebase Project ID (Optional):</label>
+            <input type="text" id="input-firebase-project" placeholder="leetsync-squads-app" class="input-dark">
+          </div>
+
+          <button class="btn-primary" id="btn-save-settings">Save & Connect</button>
+          <div class="auth-status-msg" id="auth-status-msg"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

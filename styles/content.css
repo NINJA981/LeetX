@@ -1,0 +1,123 @@
+/* LeetSync Squads - Ultra-Clean In-Page Notification Toast (Minimalist & Solid) */
+
+#leetsync-victory-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 320px;
+  background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  padding: 14px 16px;
+  color: #F0F6FC;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  z-index: 9999999;
+  overflow: hidden;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.leetsync-toast-enter {
+  animation: leetsyncToastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.leetsync-toast-leave {
+  animation: leetsyncToastOut 0.2s ease-in forwards;
+}
+
+@keyframes leetsyncToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes leetsyncToastOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+.leetsync-toast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.leetsync-toast-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #3FB950;
+}
+
+.leetsync-toast-close {
+  background: transparent;
+  border: none;
+  color: #8B949E;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.leetsync-toast-close:hover {
+  color: #F0F6FC;
+}
+
+.leetsync-toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.leetsync-toast-badge {
+  align-self: flex-start;
+  background: rgba(46, 160, 67, 0.15);
+  border: 1px solid rgba(63, 185, 80, 0.3);
+  color: #3FB950;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.leetsync-toast-msg {
+  font-size: 12px;
+  color: #C9D1D9;
+  font-weight: 400;
+}
+
+.leetsync-toast-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: #0D1117;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: #8B949E;
+  border: 1px solid #21262D;
+  margin-top: 4px;
+}
+
+.leetsync-toast-stats span {
+  display: inline-flex;
+  align-items: center;
+}
