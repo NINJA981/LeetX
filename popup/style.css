@@ -1,4 +1,4 @@
-/* LeetSync Squads - Definitive Product Polish Design System */
+/* LeetSync Squads - Coding Progress Companion Design System */
 
 :root {
   --bg-app: #FFFFFF;
@@ -38,7 +38,7 @@
 
 body {
   width: 384px;
-  height: 585px;
+  height: 590px;
   background: var(--bg-app);
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -47,6 +47,7 @@ body {
   overflow: hidden;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  position: relative;
 }
 
 #app-container {
@@ -324,13 +325,35 @@ body {
   color: #FFFFFF;
 }
 
-/* Divider line between flow sections */
 .section-divider {
   height: 1px;
   background: var(--border-subtle);
 }
 
-/* 2. Solved Problem Distribution */
+/* Review Due Banner */
+.review-due-banner {
+  padding: 10px 12px;
+  background: #FEF9C3;
+  border: 1px solid #FDE047;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.review-banner-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #854D0E;
+}
+
+.review-banner-sub {
+  font-size: 11px;
+  color: #A16207;
+}
+
+/* 2. Solved Distribution & Smart Insights */
 .solved-distribution-wrap {
   display: flex;
   align-items: center;
@@ -446,7 +469,24 @@ body {
   font-size: 12px;
 }
 
-/* 3. Next Action / Daily Problem Row */
+.smart-insights-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-subtle);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.insight-badge {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* 3. Next Action Row */
 .next-problem-row {
   display: flex;
   align-items: center;
@@ -593,7 +633,7 @@ body {
 }
 
 /* ==========================================
-   SQUAD VIEW
+   SQUAD VIEW & CHALLENGE
 ========================================== */
 .squad-control-row {
   display: flex;
@@ -667,6 +707,34 @@ body {
 .btn-icon-btn:hover {
   background: var(--bg-muted);
   color: var(--text-primary);
+}
+
+/* Weekly Squad Challenge Banner */
+.squad-challenge-card {
+  padding: 10px 12px;
+  background: var(--bg-subtle);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.challenge-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.challenge-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.challenge-target-sub {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
 }
 
 /* Leaderboard List */
@@ -875,7 +943,7 @@ body {
 }
 
 /* ==========================================
-   ROADMAP VIEW
+   ROADMAP VIEW & SMART RECOMMENDATIONS
 ========================================== */
 .roadmap-hero-panel {
   padding: 10px 12px;
@@ -890,6 +958,28 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.next-rec-card {
+  padding: 10px 12px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.next-rec-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1E40AF;
+}
+
+.next-rec-sub {
+  font-size: 11px;
+  color: #3B82F6;
 }
 
 .category-pill-strip {
@@ -932,7 +1022,7 @@ body {
   border: 1px solid var(--border-main);
   border-radius: 8px;
   overflow: hidden;
-  max-height: 330px;
+  max-height: 250px;
   overflow-y: auto;
 }
 
@@ -942,6 +1032,7 @@ body {
   justify-content: space-between;
   padding: 8px 11px;
   border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
   transition: background 0.1s ease;
 }
 .roadmap-item-row:last-child {
@@ -966,17 +1057,128 @@ body {
   flex-shrink: 0;
 }
 
-.item-title-link {
+.item-title-text {
   font-size: 12px;
   font-weight: 500;
   color: var(--text-primary);
-  text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.item-title-link:hover {
-  text-decoration: underline;
+
+/* ==========================================
+   PROBLEM DETAILS DRAWER (PROGRESSIVE DISCLOSURE)
+========================================== */
+.problem-drawer-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+  display: none;
+  align-items: flex-end;
+}
+
+.problem-drawer-content {
+  width: 100%;
+  max-height: 90%;
+  background: #FFFFFF;
+  border-radius: 12px 12px 0 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drawer-prob-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.drawer-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-subtle);
+  border-radius: 6px;
+}
+
+.drawer-stat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drawer-stat-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.drawer-stat-val {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.drawer-textarea {
+  width: 100%;
+  height: 60px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-main);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+  resize: none;
+}
+.drawer-textarea:focus {
+  border-color: var(--accent-dark);
+}
+
+.review-intervals-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-interval {
+  flex: 1;
+  padding: 5px 0;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-main);
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.btn-interval:hover {
+  background: var(--bg-muted);
+  color: var(--text-primary);
 }
 
 /* ==========================================
@@ -989,4 +1191,22 @@ body {
   padding: 12px 14px;
   background: var(--bg-subtle);
   border-radius: 8px;
+}
+
+/* Toast System */
+.toast-notice {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  background: var(--accent-dark);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: none;
+  z-index: 1000;
+  white-space: nowrap;
 }

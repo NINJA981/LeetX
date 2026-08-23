@@ -69,13 +69,22 @@
             </div>
           </div>
 
+          <!-- Review Due Banner (Conditional) -->
+          <div id="review-due-card" class="review-due-banner" style="display: none;">
+            <div>
+              <div class="review-banner-title" id="review-prob-title">#347 Top K Frequent Elements</div>
+              <div class="review-banner-sub">Revisit scheduled for today</div>
+            </div>
+            <button class="btn-secondary-flat" id="btn-start-review" style="background: #FFFFFF; font-size: 11px;">Review →</button>
+          </div>
+
           <div class="section-divider"></div>
 
-          <!-- Section 2: Solved Distribution Donut -->
+          <!-- Section 2: Solved Distribution & Smart Insights -->
           <div>
             <div class="section-label-row">
-              <span class="section-label">SOLVED DISTRIBUTION</span>
-              <span class="section-subtext" id="total-solved-meta">0 Total</span>
+              <span class="section-label">YOUR PROGRESS</span>
+              <span class="section-subtext" id="total-solved-meta">0 Solved</span>
             </div>
             <div class="solved-distribution-wrap">
               <div class="donut-chart-box">
@@ -106,15 +115,20 @@
                 </div>
               </div>
             </div>
+
+            <!-- Deterministic Insights -->
+            <div class="smart-insights-strip" id="smart-insights-box">
+              <span>💡 Focus: <span class="insight-badge" id="insight-focus-topic">Arrays & Trees</span></span>
+            </div>
           </div>
 
           <div class="section-divider"></div>
 
-          <!-- Section 3: Next Up Daily Challenge -->
+          <!-- Section 3: Next Up Action -->
           <div>
             <div class="section-label-row">
-              <span class="section-label">NEXT CHALLENGE</span>
-              <span class="section-subtext">Daily Problem</span>
+              <span class="section-label" id="next-action-header-lbl">NEXT CHALLENGE</span>
+              <span class="section-subtext" id="next-action-sub-lbl">Daily Problem</span>
             </div>
             <div class="next-problem-row">
               <div class="problem-meta-left">
@@ -160,6 +174,17 @@
             <button class="btn-secondary-flat" id="btn-join-squad">Join</button>
             <button class="btn-icon-btn" id="btn-copy-squad" title="Copy code">📋</button>
             <button class="btn-icon-btn" id="btn-leave-squad" title="New Room">🔄</button>
+          </div>
+        </div>
+
+        <!-- Weekly Squad Challenge -->
+        <div class="squad-challenge-card">
+          <div class="challenge-top">
+            <span class="challenge-title">🎯 SQUAD CHALLENGE: Solve 5 Mediums</span>
+            <span class="challenge-target-sub" id="squad-challenge-target">Target: 5</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="squad-challenge-bar" style="width: 20%;"></div>
           </div>
         </div>
 
@@ -261,6 +286,15 @@
           </div>
         </div>
 
+        <!-- Next For You Recommendation -->
+        <div class="next-rec-card" id="next-rec-box">
+          <div>
+            <div class="next-rec-title" id="rec-prob-title">NEXT FOR YOU: #1 Two Sum</div>
+            <div class="next-rec-sub" id="rec-prob-sub">Easy · Arrays & Hashing</div>
+          </div>
+          <button class="btn-cta-solve" id="btn-launch-rec" style="padding: 5px 10px; font-size: 11px;">Solve →</button>
+        </div>
+
         <div class="category-pill-strip">
           <button class="cat-pill-btn active" data-cat="all">All</button>
           <button class="cat-pill-btn" data-cat="Arrays & Hashing">Arrays</button>
@@ -322,6 +356,53 @@
         </div>
       </section>
     </main>
+
+    <!-- Problem Details Drawer (Progressive Disclosure) -->
+    <div id="problem-drawer-overlay" class="problem-drawer-overlay">
+      <div class="problem-drawer-content">
+        <div class="drawer-header">
+          <span class="drawer-prob-title" id="drawer-prob-title">#1 Two Sum</span>
+          <button class="btn-icon-btn" id="btn-close-drawer">✕</button>
+        </div>
+
+        <div class="drawer-stat-grid">
+          <div class="drawer-stat-cell">
+            <span class="drawer-stat-lbl">Difficulty</span>
+            <span class="drawer-stat-val" id="drawer-prob-diff">Easy</span>
+          </div>
+          <div class="drawer-stat-cell">
+            <span class="drawer-stat-lbl">Status</span>
+            <span class="drawer-stat-val" id="drawer-prob-status">Pending</span>
+          </div>
+          <div class="drawer-stat-cell">
+            <span class="drawer-stat-lbl">Topic</span>
+            <span class="drawer-stat-val" id="drawer-prob-cat">Arrays</span>
+          </div>
+        </div>
+
+        <div class="form-field-group">
+          <label class="field-label">My Personal Notes:</label>
+          <textarea id="drawer-notes-input" class="drawer-textarea" placeholder="e.g. Hash map complement lookup in O(n)..."></textarea>
+        </div>
+
+        <div class="form-field-group">
+          <label class="field-label">Schedule Review Revisit:</label>
+          <div class="review-intervals-row">
+            <button class="btn-interval" data-days="3">+3d</button>
+            <button class="btn-interval" data-days="7">+7d</button>
+            <button class="btn-interval" data-days="14">+14d</button>
+            <button class="btn-interval" data-days="30">+30d</button>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 4px;">
+          <a href="#" target="_blank" class="btn-cta-solve" id="drawer-launch-link" style="flex: 1; justify-content: center; text-decoration: none;">Solve on LeetCode ↗</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast-notice" class="toast-notice">✓ Synced to GitHub</div>
   </div>
 
   <script type="module" src="app.js"></script>

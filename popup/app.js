@@ -1,6 +1,6 @@
 /**
- * LeetSync Squads - Light Mode Application Engine
- * Renders live donut charts, 7-day momentum strips, real-time roadmap checkoffs, and peer duels.
+ * LeetSync Squads - Coding Progress Companion Engine
+ * Intelligence layer: Deterministic recommendations, spaced review queue, personal notes, and squad challenges.
  */
 
 import { LeetCodeAPI } from '../scripts/leetcode.js';
@@ -11,6 +11,7 @@ let currentRoadmapData = [];
 let currentRoadmapType = 'blind75';
 let userSolvedSlugs = new Set();
 let currentUsername = 'NINJA981';
+let activeDrawerProblem = null;
 
 function getTodayDateStr() {
   const d = new Date();
@@ -23,6 +24,15 @@ function getYesterdayDateStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function showToast(msg) {
+  const toast = document.getElementById('toast-notice');
+  if (toast) {
+    toast.innerText = msg;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 2200);
+  }
+}
+
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', async () => {
   setupTabs();
@@ -30,6 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await syncLiveLeetCodeSession();
   await loadDailyChallenge();
   await loadRoadmap(currentRoadmapType);
+  await checkDueReviews();
   setupEventListeners();
 });
 
@@ -208,7 +219,7 @@ function renderWeekStrip(streak, isTodaySolved) {
 function renderDonutDistribution(easy = 0, med = 0, hard = 0) {
   const total = easy + med + hard;
   document.getElementById('donut-total-count').innerText = total;
-  document.getElementById('total-solved-meta').innerText = `${total} Total`;
+  document.getElementById('total-solved-meta').innerText = `${total} Solved`;
   document.getElementById('count-easy').innerText = easy;
   document.getElementById('count-med').innerText = med;
   document.getElementById('count-hard').innerText = hard;
@@ -253,7 +264,7 @@ async function syncLiveLeetCodeSession() {
 }
 
 /**
- * Fetch and display LeetCode's Daily Problem.
+ * Fetch and display LeetCode's Daily Problem or next recommended problem.
  */
 async function loadDailyChallenge() {
   try {
@@ -275,6 +286,27 @@ async function loadDailyChallenge() {
 }
 
 /**
+ * Check and surface Due Problem Reviews.
+ */
+async function checkDueReviews() {
+  const data = await chrome.storage.local.get(['problem_reviews']);
+  const reviews = data.problem_reviews || [];
+  const now = Date.now();
+  const due = reviews.find(r => r.dueTimestamp <= now);
+
+  const banner = document.getElementById('review-due-card');
+  if (due && banner) {
+    banner.style.display = 'flex';
+    document.getElementById('review-prob-title').innerText = `#${due.id} ${due.title}`;
+    document.getElementById('btn-start-review').onclick = () => {
+      openProblemDrawer(due);
+    };
+  } else if (banner) {
+    banner.style.display = 'none';
+  }
+}
+
+/**
  * Load Selected Roadmap (Blind 75 or NeetCode 150).
  */
 async function loadRoadmap(type = 'blind75') {
@@ -284,8 +316,26 @@ async function loadRoadmap(type = 'blind75') {
     const response = await fetch(chrome.runtime.getURL(`assets/data/${fileName}`));
     currentRoadmapData = await response.json();
     renderRoadmapList('all');
+    updateNextRecommendation();
   } catch (err) {
     console.error('[Popup] Failed to load roadmap dataset:', err);
+  }
+}
+
+/**
+ * Deterministic Next Problem Recommendation Rule.
+ */
+function updateNextRecommendation() {
+  if (currentRoadmapData.length === 0) return;
+  const nextUnsolved = currentRoadmapData.find(p => !userSolvedSlugs.has(p.slug)) || currentRoadmapData[0];
+  
+  const recBox = document.getElementById('next-rec-box');
+  if (recBox && nextUnsolved) {
+    document.getElementById('rec-prob-title').innerText = `NEXT FOR YOU: #${nextUnsolved.id} ${nextUnsolved.title}`;
+    document.getElementById('rec-prob-sub').innerText = `${nextUnsolved.difficulty} · ${nextUnsolved.category}`;
+    document.getElementById('btn-launch-rec').onclick = () => {
+      window.open(`https://leetcode.com/problems/${nextUnsolved.slug}/`, '_blank');
+    };
   }
 }
 
@@ -308,13 +358,18 @@ function renderRoadmapList(categoryFilter = 'all') {
     itemEl.innerHTML = `
       <div class="item-left-desc">
         <span class="item-id-tag">#${prob.id}</span>
-        <a href="https://leetcode.com/problems/${prob.slug}/" target="_blank" class="item-title-link">${prob.title}</a>
+        <span class="item-title-text">${prob.title}</span>
       </div>
       <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
         ${isSolved ? '<span style="color: var(--color-easy); font-size: 11px; font-weight: 600; font-family: var(--font-mono);">✓ Solved</span>' : ''}
         <span class="diff-tag ${prob.difficulty}">${prob.difficulty}</span>
       </div>
     `;
+
+    // Click to open progressive disclosure drawer
+    itemEl.addEventListener('click', () => {
+      openProblemDrawer(prob);
+    });
 
     container.appendChild(itemEl);
   });
@@ -323,6 +378,28 @@ function renderRoadmapList(categoryFilter = 'all') {
   const pct = total > 0 ? Math.round((solvedCount / total) * 100) : 0;
   document.getElementById('blind75-bar').style.width = `${pct}%`;
   document.getElementById('blind75-count').innerText = `${solvedCount} / ${total} Solved (${pct}%)`;
+}
+
+/**
+ * Open Problem Detail Drawer (Progressive Disclosure).
+ */
+async function openProblemDrawer(prob) {
+  activeDrawerProblem = prob;
+  const overlay = document.getElementById('problem-drawer-overlay');
+  document.getElementById('drawer-prob-title').innerText = `#${prob.id} ${prob.title}`;
+  document.getElementById('drawer-prob-diff').innerText = prob.difficulty || 'Medium';
+  document.getElementById('drawer-prob-cat').innerText = prob.category || 'General';
+  
+  const isSolved = userSolvedSlugs.has(prob.slug);
+  document.getElementById('drawer-prob-status').innerText = isSolved ? '✓ Solved' : 'Unsolved';
+  document.getElementById('drawer-launch-link').href = `https://leetcode.com/problems/${prob.slug}/`;
+
+  // Load saved note
+  const notesData = await chrome.storage.local.get(['problem_notes']);
+  const notes = notesData.problem_notes || {};
+  document.getElementById('drawer-notes-input').value = notes[prob.slug] || '';
+
+  overlay.style.display = 'flex';
 }
 
 /**
@@ -396,6 +473,7 @@ async function renderSquad(squadCode, currentStreak = 0, currentTodaySolved = 0,
       const targetUser = e.currentTarget.dataset.user;
       await FirebaseSquads.sendNudge(squadCode, username, targetUser, '👋');
       btn.innerText = '✨';
+      showToast(`Nudged @${targetUser}!`);
       setTimeout(() => renderSquad(squadCode, currentStreak, currentTodaySolved, currentXP), 400);
     });
   });
@@ -453,6 +531,52 @@ function setupEventListeners() {
     document.getElementById('squad-room-code').innerText = newCode;
     const data = await chrome.storage.local.get(['streak_count', 'today_solved', 'user_xp']);
     await renderSquad(newCode, data.streak_count || 0, data.today_solved || 0, data.user_xp || 0);
+    showToast(`Created room ${newCode}`);
+  });
+
+  // Drawer Close Button
+  document.getElementById('btn-close-drawer')?.addEventListener('click', () => {
+    document.getElementById('problem-drawer-overlay').style.display = 'none';
+  });
+  document.getElementById('problem-drawer-overlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'problem-drawer-overlay') {
+      document.getElementById('problem-drawer-overlay').style.display = 'none';
+    }
+  });
+
+  // Save Note in Drawer
+  document.getElementById('drawer-notes-input')?.addEventListener('input', async (e) => {
+    if (!activeDrawerProblem) return;
+    const val = e.target.value;
+    const data = await chrome.storage.local.get(['problem_notes']);
+    const notes = data.problem_notes || {};
+    notes[activeDrawerProblem.slug] = val;
+    await chrome.storage.local.set({ problem_notes: notes });
+  });
+
+  // Schedule Review Interval Buttons
+  document.querySelectorAll('.btn-interval').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      if (!activeDrawerProblem) return;
+      const days = parseInt(e.target.dataset.days, 10);
+      const dueTimestamp = Date.now() + (days * 24 * 60 * 60 * 1000);
+
+      const data = await chrome.storage.local.get(['problem_reviews']);
+      const reviews = (data.problem_reviews || []).filter(r => r.slug !== activeDrawerProblem.slug);
+      reviews.push({
+        slug: activeDrawerProblem.slug,
+        id: activeDrawerProblem.id,
+        title: activeDrawerProblem.title,
+        difficulty: activeDrawerProblem.difficulty,
+        dueTimestamp,
+        intervalDays: days,
+      });
+
+      await chrome.storage.local.set({ problem_reviews: reviews });
+      showToast(`Review scheduled for +${days} days!`);
+      document.getElementById('problem-drawer-overlay').style.display = 'none';
+      await checkDueReviews();
+    });
   });
 
   // Reset Streak & XP Button (Fresh Start)
@@ -473,7 +597,7 @@ function setupEventListeners() {
       renderWeekStrip(0, false);
       const squadCode = document.getElementById('squad-room-code').innerText;
       await renderSquad(squadCode, 0, 0, 0);
-      alert('Streak and XP reset to 0!');
+      showToast('Streak and XP reset to 0');
     }
   });
 
@@ -497,12 +621,10 @@ function setupEventListeners() {
         bar.style.width = `${Math.min(90, count)}%`;
       });
 
-      // Query question details to map solved slugs & difficulty breakdown
       acceptedSubs.forEach(s => {
         userSolvedSlugs.add(s.titleSlug);
       });
 
-      // Sample difficulty distribution from dataset matching
       if (currentRoadmapData.length > 0) {
         currentRoadmapData.forEach(p => {
           if (userSolvedSlugs.has(p.slug)) {
@@ -522,9 +644,11 @@ function setupEventListeners() {
 
       renderDonutDistribution(easyCount, medCount, hardCount);
       renderRoadmapList('all');
+      updateNextRecommendation();
 
       bar.style.width = '100%';
       msg.innerText = `✓ Synced ${acceptedSubs.length} solutions to roadmap!`;
+      showToast(`✓ Synced ${acceptedSubs.length} solutions!`);
     } catch (err) {
       msg.innerText = `Notice: Please log in to leetcode.com in this browser.`;
     }
@@ -566,6 +690,7 @@ function setupEventListeners() {
 
     statusEl.innerText = `✓ Saved! Display name: @${displayName}`;
     statusEl.style.color = 'var(--color-easy)';
+    showToast('Settings saved!');
     await loadStoredState();
   });
 
@@ -578,6 +703,7 @@ function setupEventListeners() {
       await renderSquad(code.toUpperCase(), data.streak_count || 0, data.today_solved || 0, data.user_xp || 0);
       document.getElementById('squad-room-code').innerText = code.toUpperCase();
       document.getElementById('input-join-code').value = '';
+      showToast(`Joined squad ${code.toUpperCase()}`);
     }
   });
 
@@ -586,6 +712,7 @@ function setupEventListeners() {
     const code = document.getElementById('squad-room-code').innerText;
     navigator.clipboard.writeText(code);
     document.getElementById('btn-copy-squad').innerText = '✓';
+    showToast('Squad code copied!');
     setTimeout(() => { document.getElementById('btn-copy-squad').innerText = '📋'; }, 1500);
   });
 
@@ -619,6 +746,7 @@ function setupEventListeners() {
     document.querySelector('.duel-setup-form').style.display = 'none';
     document.getElementById('active-duel-problem-title').innerText = prob.title;
     document.getElementById('active-duel-link').href = `https://leetcode.com/problems/${prob.slug}/`;
+    showToast('Duel started! Good luck.');
 
     // Start timer
     let seconds = 0;
@@ -637,6 +765,7 @@ function setupEventListeners() {
     if (window.duelInterval) clearInterval(window.duelInterval);
     document.getElementById('active-duel-box').style.display = 'none';
     document.querySelector('.duel-setup-form').style.display = 'flex';
+    showToast('Match ended.');
   });
 }
 
