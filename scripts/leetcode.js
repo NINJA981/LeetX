@@ -1,197 +1,131 @@
 /**
- * LeetCode GraphQL & REST API Client for LeetSync Squads
- * Real production queries with authenticated session support.
+ * LeetCode GraphQL client. Requests run with the user's own leetcode.com
+ * session (cookies + CSRF token); nothing here talks to third parties.
  */
 
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
 const LEETCODE_BASE_URL = 'https://leetcode.com';
+export const LEETCODE_STATUS_ACCEPTED = 10;
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 export class LeetCodeAPI {
-  /**
-   * Helper to retrieve active CSRF token from browser cookies.
-   */
   static async getCsrfToken() {
     if (typeof chrome !== 'undefined' && chrome.cookies) {
       try {
-        const cookie = await chrome.cookies.get({ url: 'https://leetcode.com', name: 'csrftoken' });
+        const cookie = await chrome.cookies.get({ url: LEETCODE_BASE_URL, name: 'csrftoken' });
         if (cookie?.value) return cookie.value;
-      } catch (e) {}
+      } catch { /* cookies API unavailable in this context */ }
     }
     return '';
   }
 
   /**
-   * Execute an authenticated GraphQL query against LeetCode.
+   * Execute a GraphQL query. Returns `data` (possibly partial) or null.
+   * Throws only for rate limiting so long-running loops can back off.
    */
   static async query(query, variables = {}) {
-    try {
-      const csrf = await this.getCsrfToken();
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-      if (csrf) {
-        headers['x-csrftoken'] = csrf;
-      }
+    const csrf = await this.getCsrfToken();
+    const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+    if (csrf) headers['x-csrftoken'] = csrf;
 
-      const response = await fetch(LEETCODE_GRAPHQL_URL, {
+    let response;
+    try {
+      response = await fetch(LEETCODE_GRAPHQL_URL, {
         method: 'POST',
         headers,
         body: JSON.stringify({ query, variables }),
-        credentials: 'include', // Includes active browser session cookies
+        credentials: 'include',
       });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-      if (data.errors && data.errors.length > 0) {
-        if (data.data) return data.data;
-        return null;
-      }
-
-      return data.data || null;
     } catch (err) {
-      console.warn('[LeetCodeAPI] Query notice:', err.message);
+      console.warn('[LeetCodeAPI] network error:', err.message);
+      return null;
+    }
+
+    if (response.status === 429) {
+      const err = new Error('LeetCode rate limit reached');
+      err.rateLimited = true;
+      throw err;
+    }
+    if (!response.ok) return null;
+
+    try {
+      const body = await response.json();
+      return body.data || null;
+    } catch {
       return null;
     }
   }
 
-  /**
-   * Fetch authenticated user's current status and username.
-   */
   static async getCurrentUser() {
-    const gql = `
+    const data = await this.query(`
       query globalData {
-        userStatus {
-          isSignedIn
-          username
-          realName
-          avatar
-          userSlug
-        }
+        userStatus { isSignedIn username realName avatar userSlug }
       }
-    `;
-    const data = await this.query(gql);
-    return data?.userStatus || null;
+    `);
+    const status = data?.userStatus;
+    return status?.isSignedIn ? status : null;
   }
 
-  /**
-   * Fetch real user profile stats, streak, and solved count.
-   */
+  /** Solved counts plus the activity calendar used for the heatmap. */
   static async getUserStats(username) {
-    let userHandle = username;
-    if (!userHandle) {
-      const activeUser = await this.getCurrentUser();
-      userHandle = activeUser?.username;
-    }
-    if (!userHandle) return null;
+    let handle = username;
+    if (!handle) handle = (await this.getCurrentUser())?.username;
+    if (!handle) return null;
 
-    const gql = `
+    const data = await this.query(`
       query userProfileData($username: String!) {
         matchedUser(username: $username) {
           username
-          submitStats {
-            acSubmissionNum {
-              difficulty
-              count
-              submissions
-            }
-          }
-          submitStatsGlobal {
-            acSubmissionNum {
-              difficulty
-              count
-              submissions
-            }
-          }
-          userCalendar {
-            streak
-            totalActiveDays
-          }
+          submitStatsGlobal { acSubmissionNum { difficulty count } }
+          userCalendar { streak totalActiveDays submissionCalendar }
         }
       }
-    `;
+    `, { username: handle }).catch(() => null);
 
-    try {
-      const data = await this.query(gql, { username: userHandle });
-      const user = data?.matchedUser;
-      if (!user) return null;
+    const user = data?.matchedUser;
+    if (!user) return null;
 
-      const acList = user.submitStatsGlobal?.acSubmissionNum || user.submitStats?.acSubmissionNum || [];
-      const getCount = (diff) => {
-        const entry = acList.find(e => (e.difficulty || '').toLowerCase() === diff.toLowerCase());
-        return entry ? (parseInt(entry.count, 10) || 0) : 0;
-      };
-      const easy = getCount('Easy');
-      const med = getCount('Medium');
-      const hard = getCount('Hard');
-      const total = getCount('All') || (easy + med + hard);
+    const acList = user.submitStatsGlobal?.acSubmissionNum || [];
+    const count = diff => Number(acList.find(e => (e.difficulty || '').toLowerCase() === diff)?.count || 0);
+    const easy = count('easy');
+    const med = count('medium');
+    const hard = count('hard');
 
-      return {
-        username: user.username,
-        streak: user.userCalendar?.streak || 0,
-        total,
-        easy,
-        med,
-        hard,
-      };
-    } catch (err) {
-      return null;
-    }
+    return {
+      username: user.username,
+      total: count('all') || easy + med + hard,
+      easy,
+      med,
+      hard,
+      streak: user.userCalendar?.streak || 0,
+      totalActiveDays: user.userCalendar?.totalActiveDays || 0,
+      submissionCalendar: user.userCalendar?.submissionCalendar || '{}',
+    };
   }
 
-  /**
-   * Fetch public recent accepted submissions for any username.
-   */
-  static async getRecentAcSubmissions(username, limit = 50) {
+  static async getRecentAcSubmissions(username, limit = 20) {
     if (!username) return [];
-    const gql = `
+    const data = await this.query(`
       query recentAcSubmissions($username: String!, $limit: Int!) {
-        recentAcSubmissionList(username: $username, limit: $limit) {
-          id
-          title
-          titleSlug
-          timestamp
-        }
+        recentAcSubmissionList(username: $username, limit: $limit) { id title titleSlug timestamp }
       }
-    `;
-    try {
-      const data = await this.query(gql, { username, limit });
-      return data?.recentAcSubmissionList || [];
-    } catch (e) {
-      return [];
-    }
+    `, { username, limit }).catch(() => null);
+    return data?.recentAcSubmissionList || [];
   }
 
-  /**
-   * Fetch today's official Daily Coding Challenge.
-   */
   static async getDailyChallenge() {
-    const gql = `
+    const data = await this.query(`
       query questionOfToday {
         activeDailyCodingChallengeQuestion {
           date
           link
-          question {
-            questionFrontendId
-            title
-            titleSlug
-            difficulty
-            topicTags {
-              name
-              slug
-            }
-          }
+          question { questionFrontendId title titleSlug difficulty topicTags { name slug } }
         }
       }
-    `;
-
-    const data = await this.query(gql);
+    `).catch(() => null);
     const challenge = data?.activeDailyCodingChallengeQuestion;
-    if (!challenge) return null;
-
+    if (!challenge?.question) return null;
     return {
       date: challenge.date,
       id: challenge.question.questionFrontendId,
@@ -203,158 +137,101 @@ export class LeetCodeAPI {
     };
   }
 
-  /**
-   * Fetch all paginated submissions for historical backfills.
-   */
-  static async fetchAllAcceptedSubmissions(onProgress = null, username = '') {
-    let offset = 0;
-    const limit = 20;
-    let hasNext = true;
-    const allAccepted = [];
-    const seenProblems = new Set();
-
-    const gql = `
-      query submissionList($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: String) {
-        submissionList(offset: $offset, limit: $limit, lastKey: $lastKey, questionSlug: $questionSlug) {
-          lastKey
-          hasNext
-          submissions {
-            id
-            statusDisplay
-            lang
-            runtime
-            timestamp
-            url
-            title
-            memory
-            titleSlug
-          }
-        }
+  /** Upcoming weekly/biweekly contests: [{ title, slug, startTime (ms), duration (s) }]. */
+  static async getUpcomingContests() {
+    const data = await this.query(`
+      query upcomingContests {
+        upcomingContests { title titleSlug startTime duration }
       }
-    `;
-
-    try {
-      while (hasNext) {
-        const data = await this.query(gql, { offset, limit, lastKey: null, questionSlug: null });
-        const listObj = data?.submissionList;
-        const submissions = listObj?.submissions || [];
-
-        if (!submissions || submissions.length === 0) break;
-
-        for (const sub of submissions) {
-          if (sub.statusDisplay === 'Accepted' && !seenProblems.has(sub.titleSlug)) {
-            seenProblems.add(sub.titleSlug);
-            allAccepted.push(sub);
-            if (onProgress) onProgress(allAccepted.length, sub);
-          }
-        }
-
-        hasNext = Boolean(listObj?.hasNext) && offset < 500;
-        offset += limit;
-      }
-    } catch (e) {
-      console.warn('[LeetCodeAPI] submissionList notice:', e);
-    }
-
-    // Fallback: If submissionList was empty or forbidden, query recentAcSubmissionList
-    if (allAccepted.length === 0 && username) {
-      try {
-        const recent = await this.getRecentAcSubmissions(username, 50);
-        for (const sub of recent) {
-          if (!seenProblems.has(sub.titleSlug)) {
-            seenProblems.add(sub.titleSlug);
-            allAccepted.push({
-              id: sub.id,
-              title: sub.title,
-              titleSlug: sub.titleSlug,
-              statusDisplay: 'Accepted',
-              timestamp: sub.timestamp,
-              lang: 'python3',
-              runtime: 'N/A',
-              memory: 'N/A',
-            });
-            if (onProgress) onProgress(allAccepted.length, sub);
-          }
-        }
-      } catch (recentErr) {
-        console.warn('[LeetCodeAPI] recentAcSubmissions notice:', recentErr);
-      }
-    }
-
-    return allAccepted;
+    `).catch(() => null);
+    return (data?.upcomingContests || [])
+      .map(c => ({ title: c.title, slug: c.titleSlug, startTime: Number(c.startTime) * 1000, duration: Number(c.duration) || 5400 }))
+      .filter(c => c.slug && Number.isFinite(c.startTime))
+      .sort((a, b) => a.startTime - b.startTime);
   }
 
   /**
-   * Fetch detailed submission metadata including full code and performance metrics.
+   * Walk the signed-in user's full submission history (newest first) and keep
+   * the latest accepted submission per problem.
    */
+  static async fetchAllAcceptedSubmissions(onProgress = null, { maxPages = 250 } = {}) {
+    const limit = 20;
+    const accepted = [];
+    const seen = new Set();
+    let offset = 0;
+    let lastKey = null;
+
+    for (let page = 0; page < maxPages; page++) {
+      let data = null;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          data = await this.query(`
+            query submissionList($offset: Int!, $limit: Int!, $lastKey: String) {
+              submissionList(offset: $offset, limit: $limit, lastKey: $lastKey) {
+                lastKey
+                hasNext
+                submissions { id statusDisplay lang runtime timestamp title memory titleSlug }
+              }
+            }
+          `, { offset, limit, lastKey });
+          break;
+        } catch (err) {
+          if (!err.rateLimited) throw err;
+          await sleep(2000 * (attempt + 1));
+        }
+      }
+
+      const list = data?.submissionList;
+      const submissions = list?.submissions || [];
+      if (submissions.length === 0) break;
+
+      for (const sub of submissions) {
+        if (sub.statusDisplay === 'Accepted' && sub.titleSlug && !seen.has(sub.titleSlug)) {
+          seen.add(sub.titleSlug);
+          accepted.push(sub);
+        }
+      }
+      if (onProgress) onProgress(accepted.length, page + 1);
+
+      if (!list.hasNext) break;
+      lastKey = list.lastKey || null;
+      offset += limit;
+      await sleep(350);
+    }
+
+    return accepted;
+  }
+
   static async getSubmissionDetails(submissionId) {
-    if (!submissionId) return null;
-    const gql = `
+    if (!/^\d+$/.test(String(submissionId || ''))) return null;
+    const data = await this.query(`
       query submissionDetails($submissionId: Int!) {
         submissionDetails(submissionId: $submissionId) {
-          runtime
           runtimeDisplay
           runtimePercentile
-          memory
           memoryDisplay
           memoryPercentile
           code
           timestamp
           statusCode
-          lang {
-            name
-            verboseName
-          }
-          question {
-            questionId
-            questionFrontendId
-            title
-            titleSlug
-            difficulty
-            content
-          }
+          lang { name verboseName }
+          question { questionId questionFrontendId title titleSlug difficulty content }
         }
       }
-    `;
-
-    try {
-      const data = await this.query(gql, { submissionId: parseInt(submissionId, 10) });
-      return data?.submissionDetails || null;
-    } catch (err) {
-      console.warn('[LeetCodeAPI] getSubmissionDetails notice:', err.message);
-      return null;
-    }
+    `, { submissionId: Number(submissionId) }).catch(() => null);
+    return data?.submissionDetails || null;
   }
 
-  /**
-   * Fetch complete question details and HTML description.
-   */
   static async getQuestionDetails(titleSlug) {
     if (!titleSlug) return null;
-    const gql = `
+    const data = await this.query(`
       query questionData($titleSlug: String!) {
         question(titleSlug: $titleSlug) {
-          questionId
-          questionFrontendId
-          title
-          titleSlug
-          content
-          difficulty
-          topicTags {
-            name
-            slug
-          }
+          questionId questionFrontendId title titleSlug content difficulty
+          topicTags { name slug }
         }
       }
-    `;
-
-    try {
-      const data = await this.query(gql, { titleSlug });
-      return data?.question || null;
-    } catch (err) {
-      console.warn('[LeetCodeAPI] getQuestionDetails notice:', err.message);
-      return null;
-    }
+    `, { titleSlug }).catch(() => null);
+    return data?.question || null;
   }
 }
-

@@ -1,14 +1,22 @@
-# Dependencies & System Files
+# Dependencies & tooling
 node_modules/
 __pycache__/
 *.pyc
+.firebase/
+firebase-debug.log
+firestore-debug.log
+hs_err_pid*.log
+replay_pid*.log
+
+# OS
 .DS_Store
 Thumbs.db
 
-# Scratch temporary testing scripts (keep repo clean)
-scratch/clean_firestore.js
+# Build output - release zips are produced by CI and attached to GitHub Releases
+dist/
 
-# Keep only release packages in dist/
-dist/leetsync-squads-v1.0.*.zip
-dist/leetsync-squads-v1.1.0.zip
-dist/leetsync-squads-v1.1.1.zip
+# Local scratch & experiments
+scratch/
+
+# The landing page is its own repo (NINJA981/leetx-landing-page)
+LeetX landing page/

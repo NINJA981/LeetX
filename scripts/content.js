@@ -1,675 +1,501 @@
 /**
- * LeetSync Squads - In-Page LeetCode DOM & Submission Observer
- * Displays celebratory victory banners, confetti animations, and live squad presence.
+ * LeetX Squads - leetcode.com content script.
+ * Detects accepted submissions and shows LeetX feedback. All UI lives in a
+ * closed shadow root and is built with textContent only - no remote string is
+ * ever parsed as HTML on the page.
  */
-
-(function () {
+(() => {
   'use strict';
+  if (window.__LEETX_CONTENT__) return;
+  window.__LEETX_CONTENT__ = true;
 
-  // Guard against duplicate injection during SPA navigation
-  if (window.__LEETSYNC_SQUADS_INJECTED__) return;
-  window.__LEETSYNC_SQUADS_INJECTED__ = true;
+  const alive = () => {
+    try { return Boolean(chrome?.runtime?.id); } catch { return false; }
+  };
 
-  console.log('[LeetSync Squads] Content script initialized.');
+  // ---------------------------------------------------------------------------
+  // Shadow-DOM host
+  // ---------------------------------------------------------------------------
 
-  /**
-   * Safe check to verify if the Chrome extension context is still valid.
-   * Prevents "Extension context invalidated" errors when extension is reloaded.
-   */
-  function isExtensionValid() {
-    try {
-      return Boolean(typeof chrome !== 'undefined' && chrome?.runtime?.id);
-    } catch {
-      return false;
-    }
+  let root = null;
+  function getRoot() {
+    if (root?.host.isConnected) return root;
+    const host = document.createElement('leetx-overlay');
+    host.style.cssText = 'all: initial; position: fixed; z-index: 2147483646; inset: 0; pointer-events: none;';
+    document.documentElement.appendChild(host);
+    root = host.attachShadow({ mode: 'closed' });
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = chrome.runtime.getURL('styles/content.css');
+    root.appendChild(link);
+    const stack = document.createElement('div');
+    stack.className = 'stack';
+    root.appendChild(stack);
+    return root;
   }
 
-  function safeStorageSet(data) {
-    if (!isExtensionValid()) return;
-    try {
-      chrome.storage.local.set(data).catch(() => {});
-    } catch (e) {
-      // Extension context invalidated - safe to ignore
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const ICONS = {
+    check: ['M20 6 9 17l-5-5'],
+    flame: ['M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z'],
+    bolt: ['M13 2 3 14h9l-1 8 10-12h-9l1-8z'],
+    bell: ['M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9', 'M10.3 21a1.94 1.94 0 0 0 3.4 0'],
+    x: ['M18 6 6 18', 'm6 6 12 12'],
+    clock: ['M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z', 'M12 6v6l4 2'],
+    pencil: ['M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z', 'm15 5 4 4'],
+    snowflake: ['M2 12h20', 'M12 2v20', 'm20 16-4-4 4-4', 'm4 8 4 4-4 4', 'm16 4-4 4-4-4', 'm8 20 4-4 4 4'],
+    rotate: ['M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5'],
+    trophy: ['M6 9H4.5a2.5 2.5 0 0 1 0-5H6', 'M18 9h1.5a2.5 2.5 0 0 0 0-5H18', 'M4 22h16', 'M18 2H6v7a6 6 0 0 0 12 0V2Z'],
+  };
+  const fmtClock = sec => {
+    const s = Math.max(0, Math.floor(sec || 0));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return `${h ? `${h}:${String(m).padStart(2, '0')}` : m}:${String(s % 60).padStart(2, '0')}`;
+  };
+  function icon(name) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    for (const d of ICONS[name]) {
+      const path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', d);
+      svg.appendChild(path);
     }
+    return svg;
+  }
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
   }
 
-  function safeSendMessage(message, callback) {
-    if (!isExtensionValid()) return;
-    try {
-      chrome.runtime.sendMessage(message, (response) => {
-        if (!isExtensionValid()) return;
-        if (chrome.runtime.lastError) {
-          // Suppress error if context was invalidated during transit
-          return;
-        }
-        if (callback) callback(response);
-      });
-    } catch (e) {
-      // Extension context invalidated - safe to ignore
-    }
-  }
-
-  /**
-   * Embedded Canvas Confetti Engine (Zero external CDN dependency for 100% offline safety & CSP compliance).
-   */
-  function launchConfetti() {
-    const canvas = document.createElement('canvas');
-    canvas.id = 'leetsync-confetti-canvas';
-    canvas.style.position = 'fixed';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    canvas.style.width = '100vw';
-    canvas.style.height = '100vh';
-    canvas.style.pointerEvents = 'none';
-    canvas.style.zIndex = '999999';
-    document.body.appendChild(canvas);
-
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    const particles = [];
-    const colors = ['#10B981', '#3B82F6', '#F59E0B', '#EC4899', '#8B5CF6', '#FBBF24'];
-
-    for (let i = 0; i < 90; i++) {
-      particles.push({
-        x: canvas.width / 2,
-        y: canvas.height / 2 + 100,
-        vx: (Math.random() - 0.5) * 18,
-        vy: (Math.random() - 0.9) * 16 - 4,
-        size: Math.random() * 8 + 4,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        rotation: Math.random() * 360,
-        rSpeed: (Math.random() - 0.5) * 12,
-        alpha: 1,
-      });
-    }
-
-    let animationFrame;
-    function render() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      let alive = false;
-
-      for (const p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.4; // Gravity
-        p.rotation += p.rSpeed;
-        p.alpha -= 0.012;
-
-        if (p.alpha > 0) {
-          alive = true;
-          ctx.save();
-          ctx.globalAlpha = p.alpha;
-          ctx.translate(p.x, p.y);
-          ctx.rotate((p.rotation * Math.PI) / 180);
-          ctx.fillStyle = p.color;
-          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-          ctx.restore();
-        }
-      }
-
-      if (alive) {
-        animationFrame = requestAnimationFrame(render);
-      } else {
-        cancelAnimationFrame(animationFrame);
-        canvas.remove();
-      }
-    }
-
-    render();
-  }
-
-  /**
-   * Display modern slide-in celebration toast upon "Accepted" verdict.
-   */
-  /**
-   * Extract authentic performance metrics (Runtime ms, Memory MB, Beats %) directly from LeetCode DOM.
-   */
-  function extractSubmissionMetricsFromDOM() {
-    const result = {
-      runtimeDisplay: '0 ms',
-      runtimePercentile: null,
-      memoryDisplay: '0 MB',
-      memoryPercentile: null,
+  function present(card, ttl) {
+    const stack = getRoot().querySelector('.stack');
+    while (stack.children.length >= 3) stack.firstElementChild.remove();
+    stack.appendChild(card);
+    requestAnimationFrame(() => card.classList.add('in'));
+    const dismiss = () => {
+      card.classList.remove('in');
+      card.classList.add('out');
+      setTimeout(() => card.remove(), 220);
     };
+    card.querySelector('.close')?.addEventListener('click', dismiss);
+    let timer = setTimeout(dismiss, ttl);
+    card.addEventListener('mouseenter', () => clearTimeout(timer));
+    card.addEventListener('mouseleave', () => { timer = setTimeout(dismiss, 2500); });
+  }
 
+  function closeButton() {
+    const btn = el('button', 'close');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Dismiss');
+    btn.appendChild(icon('x'));
+    return btn;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Toasts
+  // ---------------------------------------------------------------------------
+
+  function showSolveToast(res) {
+    const card = el('section', `card solve${res.milestone ? ' milestone' : ''}`);
+    card.setAttribute('role', 'status');
+
+    const head = el('div', 'head');
+    const badge = el('span', 'badge ok');
+    badge.appendChild(icon('check'));
+    head.appendChild(badge);
+    const titles = el('div', 'titles');
+    titles.appendChild(el('div', 'eyebrow', res.milestone ? `${res.milestone}-day streak` : 'Accepted'));
+    titles.appendChild(el('div', 'title', res.problem?.title || 'Problem solved'));
+    head.appendChild(titles);
+    head.appendChild(closeButton());
+    card.appendChild(head);
+
+    const stats = el('div', 'stats');
+    const streak = el('div', 'stat');
+    const flame = el('span', `ico ${res.streakExtended ? 'hot' : ''}`);
+    flame.appendChild(icon('flame'));
+    streak.appendChild(flame);
+    streak.appendChild(el('span', 'num', res.streak));
+    streak.appendChild(el('span', 'lbl', 'day streak'));
+    stats.appendChild(streak);
+
+    const xp = el('div', 'stat');
+    const bolt = el('span', 'ico');
+    bolt.appendChild(icon('bolt'));
+    xp.appendChild(bolt);
+    xp.appendChild(el('span', 'num', `+${res.xpEarned || 0}`));
+    xp.appendChild(el('span', 'lbl', 'XP'));
+    stats.appendChild(xp);
+
+    if (res.solveSeconds) {
+      const time = el('div', 'stat');
+      const clock = el('span', `ico ${res.isNewBest ? 'best' : ''}`);
+      clock.appendChild(icon('clock'));
+      time.appendChild(clock);
+      time.appendChild(el('span', 'num', fmtClock(res.solveSeconds)));
+      time.appendChild(el('span', 'lbl', res.isNewBest ? 'new best' : 'time'));
+      stats.appendChild(time);
+    }
+    card.appendChild(stats);
+
+    const metrics = [];
+    if (res.runtimeDisplay) metrics.push(`${res.runtimeDisplay}${res.runtimePercentile != null ? ` · beats ${Number(res.runtimePercentile).toFixed(0)}%` : ''}`);
+    if (res.memoryDisplay) metrics.push(res.memoryDisplay);
+    if (metrics.length) card.appendChild(el('div', 'meta', metrics.join('   ·   ')));
+    if (res.leveledUp) card.appendChild(el('div', 'meta accent', `Level ${res.level} reached`));
+    else if (res.streakExtended && !res.milestone) card.appendChild(el('div', 'meta', 'Streak extended. Done for today.'));
+    if (res.freezeEarned) card.appendChild(metaWithIcon('snowflake', `Streak freeze earned · ${res.freezes} ready`, 'ice'));
+    if (res.review?.done) card.appendChild(metaWithIcon('rotate', res.review.nextInDays ? `Review done · next in ${res.review.nextInDays} days` : 'Review done · you know this one now'));
+    else if (res.review?.scheduledInDays) card.appendChild(metaWithIcon('rotate', `Review scheduled in ${res.review.scheduledInDays} days`));
+    for (const a of res.achievements || []) card.appendChild(metaWithIcon('trophy', `Achievement: ${a.title}`, 'gold'));
+    if (!res.isNewProblem && !res.review?.done) card.appendChild(el('div', 'meta', 'Solved before, so practice XP only.'));
+
+    present(card, res.milestone || res.achievements?.length ? 9000 : 6500);
+    if (res.milestone || res.leveledUp || res.achievements?.length) burst(70);
+    else if (res.streakExtended) burst(28);
+  }
+
+  function metaWithIcon(name, text, tone = '') {
+    const row = el('div', `meta with-icon ${tone}`.trim());
+    row.appendChild(icon(name));
+    row.appendChild(el('span', null, text));
+    return row;
+  }
+
+  function showAlert(title, message) {
+    const card = el('section', 'card alert');
+    card.setAttribute('role', 'status');
+    const head = el('div', 'head');
+    const badge = el('span', 'badge');
+    badge.appendChild(icon('bell'));
+    head.appendChild(badge);
+    const titles = el('div', 'titles');
+    titles.appendChild(el('div', 'title', title || 'LeetX'));
+    if (message) titles.appendChild(el('div', 'body', message));
+    head.appendChild(titles);
+    head.appendChild(closeButton());
+    card.appendChild(head);
+    present(card, 6000);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Confetti (canvas, respects reduced motion)
+  // ---------------------------------------------------------------------------
+
+  function burst(count) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2147483645';
+    document.documentElement.appendChild(canvas);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = innerWidth * dpr;
+    canvas.height = innerHeight * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const colors = ['#F43F5E', '#F59E0B', '#22C55E', '#38BDF8', '#E5E7EB'];
+    const originX = innerWidth - 180;
+    const originY = innerHeight - 120;
+    const parts = Array.from({ length: count }, () => ({
+      x: originX, y: originY,
+      vx: (Math.random() - 0.7) * 11, vy: -Math.random() * 13 - 4,
+      s: Math.random() * 5 + 3, r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3,
+      c: colors[(Math.random() * colors.length) | 0], a: 1,
+    }));
+    const frame = () => {
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      let any = false;
+      for (const p of parts) {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.42; p.vx *= 0.99; p.r += p.vr; p.a -= 0.014;
+        if (p.a <= 0) continue;
+        any = true;
+        ctx.save();
+        ctx.globalAlpha = p.a;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.r);
+        ctx.fillStyle = p.c;
+        ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+        ctx.restore();
+      }
+      if (any) requestAnimationFrame(frame);
+      else canvas.remove();
+    };
+    requestAnimationFrame(frame);
+  }
+
+  // ---------------------------------------------------------------------------
+  // On-page companion: streak, active-time solve timer, context and notes
+  // ---------------------------------------------------------------------------
+
+  const companion = { slug: null, node: null, seconds: 0, ctx: null, notesOpen: false, hidden: false };
+  const timerKey = slug => `leetx_timer_${slug}`;
+
+  function loadAttemptTimer(slug) {
+    try { return Number(sessionStorage.getItem(timerKey(slug))) || 0; } catch { return 0; }
+  }
+  function saveAttemptTimer() {
+    if (!companion.slug) return;
+    try { sessionStorage.setItem(timerKey(companion.slug), String(companion.seconds)); } catch { /* storage blocked */ }
+  }
+  function resetAttemptTimer(slug) {
+    if (companion.slug !== slug) return;
+    companion.seconds = 0;
+    saveAttemptTimer();
+    paintTimer();
+  }
+
+  setInterval(() => {
+    if (!alive()) return;
+    const slug = currentSlug();
+    if (slug !== companion.slug) {
+      saveAttemptTimer();
+      companion.slug = slug;
+      companion.seconds = slug ? loadAttemptTimer(slug) : 0;
+      companion.notesOpen = false;
+      if (slug) refreshCompanion(); else removeCompanion();
+      return;
+    }
+    // Only time you actually spend looking at the problem counts.
+    if (slug && document.visibilityState === 'visible') {
+      companion.seconds += 1;
+      if (companion.seconds % 5 === 0) saveAttemptTimer();
+      paintTimer();
+    }
+  }, 1000);
+  window.addEventListener('pagehide', saveAttemptTimer);
+
+  function removeCompanion() {
+    companion.node?.remove();
+    companion.node = null;
+  }
+
+  function paintTimer() {
+    const t = companion.node?.querySelector('.cmp-time');
+    if (t) t.textContent = fmtClock(companion.seconds);
+  }
+
+  function refreshCompanion() {
+    const slug = companion.slug;
+    if (!slug || companion.hidden || !alive()) return;
     try {
-      const containers = [
-        document.querySelector('[data-e2e-locator="submission-result"]'),
-        document.querySelector('[class*="result-container"], [class*="submission-result"], [data-cypress="SubmissionResult"], [class*="result-state"]'),
-        document.body
-      ];
+      chrome.runtime.sendMessage({ type: 'GET_PROBLEM_CONTEXT', slug }, ctx => {
+        if (chrome.runtime.lastError || !ctx?.success || slug !== companion.slug) return;
+        companion.ctx = ctx;
+        if (!ctx.enabled) { removeCompanion(); return; }
+        renderCompanion();
+      });
+    } catch { /* extension reloaded */ }
+  }
 
-      let fullText = '';
-      for (const c of containers) {
-        if (c && c.innerText && (c.innerText.includes('Runtime') || c.innerText.includes('Memory') || c.innerText.includes('Accepted'))) {
-          fullText = c.innerText;
-          break;
-        }
-      }
-      if (!fullText) fullText = document.body?.innerText || '';
+  function stop(e) { e.stopPropagation(); }
 
-      // 1. Runtime Display (e.g., "12 ms", "45 ms", "0.5 s")
-      const runtimeMatch = fullText.match(/Runtime\s*[:\n\r]*\s*(\d+(?:\.\d+)?\s*(?:ms|s))/i) || fullText.match(/(\d+(?:\.\d+)?\s*ms)/i);
-      if (runtimeMatch) {
-        result.runtimeDisplay = runtimeMatch[1].trim();
-      }
+  function renderCompanion() {
+    const { ctx } = companion;
+    const root = getRoot();
+    removeCompanion();
 
-      // 2. Memory Display (e.g., "12.63 MB", "14.2 MB", "4200 KB")
-      const memoryMatch = fullText.match(/Memory\s*[:\n\r]*\s*(\d+(?:\.\d+)?\s*(?:MB|KB|GB))/i) || fullText.match(/(\d+(?:\.\d+)?\s*(?:MB|KB))/i);
-      if (memoryMatch) {
-        result.memoryDisplay = memoryMatch[1].trim();
-      }
+    const wrap = el('div', 'companion');
+    // Keep LeetCode's global keyboard shortcuts from reacting to typing in our UI.
+    for (const type of ['keydown', 'keyup', 'keypress']) wrap.addEventListener(type, stop);
 
-      // 3. Runtime Percentile (e.g., "Runtime ... Beats 83.46%")
-      const runtimeBeatsMatch = fullText.match(/Runtime[\s\S]*?Beats\s*(\d+(?:\.\d+)?)\s*%/i) || fullText.match(/Beats\s*(\d+(?:\.\d+)?)\s*%/i);
-      if (runtimeBeatsMatch) {
-        result.runtimePercentile = parseFloat(runtimeBeatsMatch[1]);
-      }
+    if (companion.notesOpen) wrap.appendChild(notesPanel(ctx));
 
-      // 4. Memory Percentile (e.g., "Memory ... Beats 75.74%")
-      const memoryBeatsMatch = fullText.match(/Memory[\s\S]*?Beats\s*(\d+(?:\.\d+)?)\s*%/i);
-      if (memoryBeatsMatch) {
-        result.memoryPercentile = parseFloat(memoryBeatsMatch[1]);
-      }
-    } catch (err) {
-      console.warn('[LeetSync Content] DOM metrics parsing notice:', err);
+    const pill = el('div', 'pill');
+    pill.setAttribute('role', 'toolbar');
+    pill.setAttribute('aria-label', 'LeetX');
+
+    const streak = el('span', `pill-item streak ${ctx.solvedToday ? 'hot' : ''}`);
+    streak.title = ctx.solvedToday ? `${ctx.streak}-day streak, done for today` : `${ctx.streak}-day streak, solve one today`;
+    streak.appendChild(icon('flame'));
+    streak.appendChild(el('span', null, ctx.streak));
+    pill.appendChild(streak);
+
+    const time = el('span', 'pill-item');
+    time.title = ctx.bestSeconds ? `Time on this problem · your best is ${fmtClock(ctx.bestSeconds)}` : 'Time on this problem (only while the tab is visible)';
+    time.appendChild(icon('clock'));
+    time.appendChild(el('span', 'cmp-time', fmtClock(companion.seconds)));
+    pill.appendChild(time);
+
+    if (ctx.reviewDue) {
+      const due = el('span', 'pill-item review');
+      due.title = 'Review due: solving this counts as your review';
+      due.appendChild(icon('rotate'));
+      due.appendChild(el('span', null, 'Review'));
+      pill.appendChild(due);
     }
 
-    return result;
+    const notesBtn = el('button', `pill-btn ${companion.notesOpen ? 'is-on' : ''}`);
+    notesBtn.type = 'button';
+    notesBtn.setAttribute('aria-label', companion.notesOpen ? 'Close notes' : 'Notes');
+    notesBtn.setAttribute('aria-expanded', String(companion.notesOpen));
+    notesBtn.title = 'Notes for this problem';
+    notesBtn.appendChild(icon('pencil'));
+    notesBtn.addEventListener('click', () => { companion.notesOpen = !companion.notesOpen; renderCompanion(); });
+    pill.appendChild(notesBtn);
+
+    const hide = el('button', 'pill-btn');
+    hide.type = 'button';
+    hide.setAttribute('aria-label', 'Hide LeetX on this page');
+    hide.title = 'Hide until reload (turn off in LeetX settings)';
+    hide.appendChild(icon('x'));
+    hide.addEventListener('click', () => { companion.hidden = true; removeCompanion(); });
+    pill.appendChild(hide);
+
+    wrap.appendChild(pill);
+    root.appendChild(wrap);
+    companion.node = wrap;
+    if (companion.notesOpen) wrap.querySelector('textarea')?.focus();
   }
 
-  /**
-   * Extract editor solution code from Monaco / CodeMirror DOM elements.
-   */
-  function extractCodeFromDOM() {
-    try {
-      const monacoLines = document.querySelectorAll('.view-lines .view-line');
-      if (monacoLines && monacoLines.length > 0) {
-        return Array.from(monacoLines).map(l => l.innerText).join('\n');
-      }
-      const codeArea = document.querySelector('textarea.monaco-mouse-cursor-text, .CodeMirror-code, pre code');
-      if (codeArea) return codeArea.value || codeArea.innerText;
-    } catch (e) {}
-    return '';
-  }
+  function notesPanel(ctx) {
+    const panel = el('div', 'notes-panel');
+    const chips = el('div', 'chips');
+    for (const l of ctx.lists) chips.appendChild(el('span', 'chip', `${l.label} · ${l.category}`));
+    if (ctx.solvedBefore) chips.appendChild(el('span', 'chip ok', 'Solved before'));
+    if (ctx.bestSeconds) chips.appendChild(el('span', 'chip', `Best ${fmtClock(ctx.bestSeconds)}`));
+    if (chips.children.length) panel.appendChild(chips);
 
-  /**
-   * Display modern slide-in celebration toast upon "Accepted" verdict with authentic metrics.
-   */
-  function showVictoryToast(data) {
-    // Remove existing toast if any
-    const existing = document.getElementById('leetsync-victory-toast');
-    if (existing) existing.remove();
+    const head = el('div', 'notes-head');
+    head.appendChild(el('span', 'notes-title', 'Notes'));
+    const state = el('span', 'notes-state', '');
+    head.appendChild(state);
+    panel.appendChild(head);
 
-    launchConfetti();
-
-    const toast = document.createElement('div');
-    toast.id = 'leetsync-victory-toast';
-    toast.className = 'leetsync-toast-enter';
-
-    const rtPercentile = data.runtimePercentile !== undefined && data.runtimePercentile !== null && !isNaN(parseFloat(data.runtimePercentile))
-      ? parseFloat(data.runtimePercentile)
-      : null;
-    const memPercentile = data.memoryPercentile !== undefined && data.memoryPercentile !== null && !isNaN(parseFloat(data.memoryPercentile))
-      ? parseFloat(data.memoryPercentile)
-      : null;
-
-    const runtimePct = rtPercentile !== null ? `Beats ${rtPercentile.toFixed(1)}%` : 'Accepted';
-    const memoryPct = memPercentile !== null ? ` (Beats ${memPercentile.toFixed(1)}%)` : '';
-    const runtimeTitle = (rtPercentile && rtPercentile > 80) ? '🚀 Speed Demon' : '⚡ Synced';
-
-    toast.innerHTML = `
-      <div class="leetsync-toast-header">
-        <div class="leetsync-toast-title">
-          <span class="leetsync-flame-icon">🔥</span>
-          <span>LeetX Squads</span>
-        </div>
-        <button class="leetsync-toast-close" id="leetsync-toast-close-btn">&times;</button>
-      </div>
-      <div class="leetsync-toast-body">
-        <div class="leetsync-toast-badge">${runtimeTitle}</div>
-        <div class="leetsync-toast-msg">Problem pushed to GitHub with authentic metrics!</div>
-        <div class="leetsync-toast-stats">
-          <span>⏱️ ${data.runtimeDisplay || '0 ms'} (${runtimePct})</span>
-          <span>💾 ${data.memoryDisplay || '0 MB'}${memoryPct}</span>
-          <span>🌟 +${data.xpEarned || 25} XP</span>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(toast);
-
-    document.getElementById('leetsync-toast-close-btn')?.addEventListener('click', () => {
-      toast.classList.add('leetsync-toast-leave');
-      setTimeout(() => toast.remove(), 350);
+    const key = `notes_${companion.slug}`;
+    const area = document.createElement('textarea');
+    area.className = 'notes-input';
+    area.rows = 6;
+    area.placeholder = 'Approach, complexity, the edge case that bit you…';
+    area.setAttribute('aria-label', 'Notes for this problem');
+    chrome.storage.local.get(key).then(d => { area.value = d[key] || ''; });
+    let timer = null;
+    area.addEventListener('input', () => {
+      state.textContent = 'Saving…';
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        if (!alive()) return;
+        if (area.value.trim()) await chrome.storage.local.set({ [key]: area.value });
+        else await chrome.storage.local.remove(key);
+        state.textContent = 'Saved';
+      }, 400);
     });
-
-    // Auto dismiss after 7 seconds
-    setTimeout(() => {
-      if (document.body.contains(toast)) {
-        toast.classList.add('leetsync-toast-leave');
-        setTimeout(() => toast.remove(), 350);
-      }
-    }, 7000);
+    panel.appendChild(area);
+    panel.appendChild(el('div', 'notes-hint', 'Synced to GitHub as Notes.md with your next accepted solve.'));
+    return panel;
   }
 
-  /**
-   * Extract title slug from current LeetCode URL (e.g. /problems/two-sum/ -> two-sum).
-   */
-  function getCurrentTitleSlug() {
-    const match = window.location.pathname.match(/\/problems\/([a-z0-9-]+)/i);
-    return match ? match[1] : null;
+  // ---------------------------------------------------------------------------
+  // Submission detection
+  // ---------------------------------------------------------------------------
+
+  let watching = false;
+  let watchStarted = 0;
+  let pollTimer = null;
+  const reported = new Set();
+
+  const currentSlug = () => location.pathname.match(/\/problems\/([a-z0-9-]+)/i)?.[1]?.toLowerCase() || null;
+
+  function startWatching() {
+    watching = true;
+    watchStarted = Date.now();
+    clearInterval(pollTimer);
+    pollTimer = setInterval(checkResult, 500);
   }
 
-  /**
-   * Intercept submission results from LeetCode GraphQL / DOM.
-   */
-  /**
-   * Intercept submission results from LeetCode GraphQL / DOM.
-   */
-  const processedSubmissions = new Set();
-  let isSubmittingLive = false;
-  let submissionStartTime = 0;
-  let pollInterval = null;
-
-  function triggerSubmissionDetection() {
-    isSubmittingLive = true;
-    submissionStartTime = Date.now();
-    startSubmissionPolling();
+  function stopWatching() {
+    watching = false;
+    clearInterval(pollTimer);
+    pollTimer = null;
   }
 
-  function startSubmissionPolling() {
-    if (pollInterval) clearInterval(pollInterval);
-    let attempts = 0;
-    pollInterval = setInterval(() => {
-      if (!isExtensionValid()) {
-        clearInterval(pollInterval);
-        pollInterval = null;
-        isSubmittingLive = false;
-        return;
-      }
-      attempts++;
-      if (!isSubmittingLive || attempts > 50) {
-        clearInterval(pollInterval);
-        pollInterval = null;
-        isSubmittingLive = false;
-        return;
-      }
-      checkForAcceptedSolve();
-    }, 600);
-  }
-
-  function extractDifficultyFromDOM() {
-    const diffEl = document.querySelector('[class*="text-difficulty-"], [class*="text-sd-easy"], [class*="text-sd-medium"], [class*="text-sd-hard"], [class*="text-easy"], [class*="text-medium"], [class*="text-hard"], [data-degree]');
-    if (diffEl) {
-      const text = diffEl.innerText.trim();
-      if (/easy/i.test(text)) return 'Easy';
-      if (/hard/i.test(text)) return 'Hard';
-      if (/med/i.test(text)) return 'Medium';
-    }
+  function difficultyFromPage() {
+    const node = document.querySelector('[class*="text-difficulty-"], [class*="text-sd-easy"], [class*="text-sd-medium"], [class*="text-sd-hard"]');
+    const text = node?.textContent || '';
+    if (/easy/i.test(text)) return 'Easy';
+    if (/hard/i.test(text)) return 'Hard';
     return 'Medium';
   }
 
-  function checkForAcceptedSolve() {
-    if (!isExtensionValid()) {
-      if (pollInterval) {
-        clearInterval(pollInterval);
-        pollInterval = null;
-      }
-      isSubmittingLive = false;
-      return;
-    }
+  function metricsFromPage(container) {
+    const text = container?.innerText || '';
+    const num = re => text.match(re)?.[1] ?? null;
+    return {
+      runtimeDisplay: num(/Runtime[\s\S]{0,40}?(\d+(?:\.\d+)?\s*ms)/i),
+      runtimePercentile: num(/Runtime[\s\S]{0,80}?Beats\s*(\d+(?:\.\d+)?)\s*%/i),
+      memoryDisplay: num(/Memory[\s\S]{0,40}?(\d+(?:\.\d+)?\s*MB)/i),
+      memoryPercentile: num(/Memory[\s\S]{0,80}?Beats\s*(\d+(?:\.\d+)?)\s*%/i),
+    };
+  }
 
-    // Only check if user has actively clicked Submit or pressed shortcut within the last 35 seconds
-    if (!isSubmittingLive) return;
-    if (Date.now() - submissionStartTime > 35000) {
-      isSubmittingLive = false;
-      return;
-    }
+  function checkResult() {
+    if (!alive()) { stopWatching(); return; }
+    if (!watching) return;
+    if (Date.now() - watchStarted > 40000) { stopWatching(); return; }
 
-    const slug = getCurrentTitleSlug();
+    const slug = currentSlug();
     if (!slug) return;
 
-    // Specifically target submission result containers/modals, not static text on the page
-    const successEl = document.querySelector('[data-e2e-locator="submission-result"]');
-    const resultBox = document.querySelector('[class*="result-container"], [class*="submission-result"], [data-cypress="SubmissionResult"], [class*="result-state"]');
-
-    let isAccepted = false;
-    if (successEl && (successEl.innerText.includes('Accepted') || successEl.innerText.includes('Success'))) {
-      isAccepted = true;
-    } else if (resultBox && (resultBox.innerText.includes('Accepted') || resultBox.innerText.includes('Success')) && (resultBox.innerText.includes('Runtime') || resultBox.innerText.includes('Beats') || resultBox.innerText.includes('testcases passed'))) {
-      isAccepted = true;
+    let result = document.querySelector('[data-e2e-locator="submission-result"]');
+    if (!result) {
+      // Fallback for LeetCode layouts without the e2e hook: a result panel that
+      // reports both a verdict and runtime stats.
+      const panel = document.querySelector('[class*="result-container"], [class*="submission-result"], [data-cypress="SubmissionResult"]');
+      if (panel && /Runtime|testcases passed/.test(panel.textContent || '')) result = panel;
     }
+    if (!result || !/Accepted/.test(result.textContent || '')) return;
+    stopWatching();
 
-    if (!isAccepted) return;
+    const link = document.querySelector('a[href*="/submissions/detail/"]');
+    const submissionId = (link?.getAttribute('href') || location.href).match(/\/submissions\/(?:detail\/)?(\d+)/)?.[1] || null;
+    const key = submissionId || `${slug}@${watchStarted}`;
+    if (reported.has(key)) return;
+    reported.add(key);
 
-    // Confirmed accepted verdict for the live active submission
-    isSubmittingLive = false; // Immediately disable to prevent re-triggering
-
-    // Extract submission id from link or URL or generate a unique deterministic key for this solve
-    const link = document.querySelector('a[href*="/submissions/detail/"], a[href*="/submissions/"]');
-    const match = link?.href?.match(/\/submissions\/(?:detail\/)?(\d+)/) || window.location.href.match(/\/submissions\/(\d+)/);
-    const subId = match ? match[1] : `sub_${slug}_${Math.floor(submissionStartTime / 1000)}`;
-
-    const submissionKey = `${slug}_${subId}`;
-    if (processedSubmissions.has(submissionKey)) return;
-    processedSubmissions.add(submissionKey);
-
-    const difficulty = extractDifficultyFromDOM();
-    const metrics = extractSubmissionMetricsFromDOM();
-    const code = extractCodeFromDOM();
-    const diffNorm = difficulty.toLowerCase();
-    const defaultXp = diffNorm === 'hard' ? 50 : (diffNorm === 'easy' ? 10 : 25);
-
-    console.log(`[LeetSync Squads] Verified Live Accepted Submission for "${slug}" [${difficulty}] (ID: ${subId})`, metrics);
-
-    const payload = {
+    const container = result.closest('[class*="flex-col"]') || result.parentElement?.parentElement || document.body;
+    const message = {
       type: 'SYNC_SUBMISSION',
-      submissionId: subId,
+      submissionId,
       titleSlug: slug,
-      difficulty,
-      code,
-      runtimeDisplay: metrics.runtimeDisplay,
-      runtimePercentile: metrics.runtimePercentile,
-      memoryDisplay: metrics.memoryDisplay,
-      memoryPercentile: metrics.memoryPercentile,
+      difficulty: difficultyFromPage(),
+      ...metricsFromPage(container),
+      solveSeconds: companion.slug === slug ? companion.seconds : null,
     };
+    resetAttemptTimer(slug);
 
-    safeSendMessage(payload, (response) => {
-      let liveMetrics = extractSubmissionMetricsFromDOM();
-      if (!liveMetrics.runtimeDisplay || liveMetrics.runtimeDisplay === '0 ms') {
-        liveMetrics = metrics;
-      }
-
-      const toastData = {
-        ...response,
-        runtimeDisplay: liveMetrics.runtimeDisplay || response?.runtimeDisplay || '0 ms',
-        runtimePercentile: liveMetrics.runtimePercentile !== null ? liveMetrics.runtimePercentile : (response?.runtimePercentile ?? null),
-        memoryDisplay: liveMetrics.memoryDisplay || response?.memoryDisplay || '0 MB',
-        memoryPercentile: liveMetrics.memoryPercentile !== null ? liveMetrics.memoryPercentile : (response?.memoryPercentile ?? null),
-        xpEarned: response?.xpEarned || defaultXp,
-      };
-
-      showVictoryToast(toastData);
-    });
-
-    // Refresh stats after short delays so LeetCode backend updates are captured
-    setTimeout(syncLeetCodeProfileStats, 1500);
-    setTimeout(syncLeetCodeProfileStats, 3500);
-  }
-
-  function getInPageCsrfToken() {
     try {
-      const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-      return match ? match[1] : '';
-    } catch {
-      return '';
-    }
-  }
-
-  /**
-   * Scrape stats directly from DOM elements on LeetCode user profile pages.
-   */
-  function scrapeProfileDOM() {
-    if (!isExtensionValid()) return;
-    try {
-      const path = window.location.pathname;
-      const userMatch = path.match(/\/(?:u|profile)\/([a-zA-Z0-9_-]+)/i);
-      if (userMatch && userMatch[1]) {
-        safeStorageSet({ leetcode_username: userMatch[1] });
-      }
-
-      const pageText = document.body.innerText || '';
-      // Look for patterns like "115/4033 Solved" or "Easy 71/961"
-      const totalMatch = pageText.match(/(\d+)\s*\/\s*\d+\s*(?:Solved|solved)/i);
-      const easyMatch = pageText.match(/Easy\s*(\d+)\s*\/\s*\d+/i) || pageText.match(/(\d+)\s*\/\s*\d+\s*Easy/i);
-      const medMatch = pageText.match(/Med(?:ium|\.)?\s*(\d+)\s*\/\s*\d+/i) || pageText.match(/(\d+)\s*\/\s*\d+\s*Med/i);
-      const hardMatch = pageText.match(/Hard\s*(\d+)\s*\/\s*\d+/i) || pageText.match(/(\d+)\s*\/\s*\d+\s*Hard/i);
-
-      if (totalMatch && totalMatch[1]) {
-        const total = parseInt(totalMatch[1], 10);
-        const easy = easyMatch ? parseInt(easyMatch[1], 10) : 0;
-        const med = medMatch ? parseInt(medMatch[1], 10) : 0;
-        const hard = hardMatch ? parseInt(hardMatch[1], 10) : 0;
-
-        if (total > 0) {
-          safeStorageSet({
-            total_solved: total,
-            solved_easy_count: easy,
-            solved_med_count: med,
-            solved_hard_count: hard,
-          });
-        }
-      }
-    } catch (e) {}
-  }
-
-  /**
-   * Automatically detect logged-in username and live solve statistics on LeetCode.
-   */
-  function syncLeetCodeProfileStats() {
-    if (!isExtensionValid()) return;
-    try {
-      // 1. Instant DOM scraping for profile pages
-      scrapeProfileDOM();
-
-      // 2. Scrape from __NEXT_DATA__
-      const nextDataEl = document.getElementById('__NEXT_DATA__');
-      if (nextDataEl) {
-        try {
-          const nextData = JSON.parse(nextDataEl.innerText);
-          const props = nextData?.props?.pageProps;
-          const userStatus = props?.userStatus;
-          const userProfile = props?.userProfile || props?.profile;
-          const submitStats = props?.submitStatsGlobal || props?.submitStats || userProfile?.submitStatsGlobal || userProfile?.submitStats;
-
-          const lcUser = userStatus?.username || userProfile?.userSlug || userProfile?.username;
-          if (lcUser) {
-            safeStorageSet({ leetcode_username: lcUser });
-          }
-
-          if (submitStats?.acSubmissionNum) {
-            const acList = submitStats.acSubmissionNum;
-            const getCount = (d) => acList.find(x => x.difficulty.toLowerCase() === d.toLowerCase())?.count || 0;
-            const total = getCount('all');
-            const easy = getCount('easy');
-            const med = getCount('medium');
-            const hard = getCount('hard');
-            if (total > 0) {
-              safeStorageSet({
-                total_solved: total,
-                solved_easy_count: easy,
-                solved_med_count: med,
-                solved_hard_count: hard,
-              });
-            }
-          }
-        } catch (jsonErr) {}
-      }
-
-      // 3. Query authenticated GraphQL endpoint directly within page context
-      const csrf = getInPageCsrfToken();
-      const headers = { 'Content-Type': 'application/json' };
-      if (csrf) headers['x-csrftoken'] = csrf;
-
-      fetch('https://leetcode.com/graphql', {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({
-          query: `
-            query userSessionAndStats {
-              userStatus {
-                isSignedIn
-                username
-              }
-            }
-          `
-        })
-      }).then(r => r.json()).then(res => {
-        if (!isExtensionValid()) return;
-        let username = res?.data?.userStatus?.username;
-        if (!username) {
-          const userMatch = window.location.pathname.match(/\/(?:u|profile)\/([a-zA-Z0-9_-]+)/i);
-          if (userMatch && userMatch[1]) username = userMatch[1];
-        }
-
-        if (username) {
-          safeStorageSet({ leetcode_username: username });
-
-          fetch('https://leetcode.com/graphql', {
-            method: 'POST',
-            headers,
-            credentials: 'include',
-            body: JSON.stringify({
-              query: `
-                query userProfileStats($username: String!) {
-                  matchedUser(username: $username) {
-                    submitStatsGlobal {
-                      acSubmissionNum {
-                        difficulty
-                        count
-                      }
-                    }
-                    submitStats {
-                      acSubmissionNum {
-                        difficulty
-                        count
-                      }
-                    }
-                  }
-                }
-              `,
-              variables: { username }
-            })
-          }).then(r => r.json()).then(statsRes => {
-            if (!isExtensionValid()) return;
-            const user = statsRes?.data?.matchedUser;
-            const acList = user?.submitStatsGlobal?.acSubmissionNum || user?.submitStats?.acSubmissionNum || [];
-            if (acList.length > 0) {
-              const getCount = (d) => acList.find(x => x.difficulty.toLowerCase() === d.toLowerCase())?.count || 0;
-              const total = getCount('all') || (getCount('easy') + getCount('medium') + getCount('hard'));
-              const easy = getCount('easy');
-              const med = getCount('medium');
-              const hard = getCount('hard');
-              if (total > 0) {
-                safeStorageSet({
-                  total_solved: total,
-                  solved_easy_count: easy,
-                  solved_med_count: med,
-                  solved_hard_count: hard,
-                });
-              }
-            }
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-    } catch (e) {
-      console.warn('[LeetSync Content] Profile sync notice:', e);
-    }
-  }
-
-  function observeSubmissions() {
-    if (!isExtensionValid()) return;
-
-    // 1. Mutation Observer for DOM changes (only check for solves if a live submission is underway)
-    let debounceTimer = null;
-    const observer = new MutationObserver(() => {
-      if (!isExtensionValid()) {
-        observer.disconnect();
-        return;
-      }
-      if (isSubmittingLive) {
-        checkForAcceptedSolve();
-      }
-      if (window.location.pathname.includes('/u/') || window.location.pathname.includes('/profile/')) {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(syncLeetCodeProfileStats, 800);
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // 2. Active Trigger when Submit button is clicked
-    document.addEventListener('click', (e) => {
-      if (!isExtensionValid()) return;
-      const target = e.target.closest('button');
-      if (target) {
-        const text = (target.innerText || '').trim();
-        if (text === 'Submit' || target.dataset.e2eLocator === 'console-submit-button' || target.getAttribute('data-cypress') === 'SubmitCode') {
-          triggerSubmissionDetection();
-        }
-      }
-    });
-
-    // 3. Active Trigger on keyboard shortcut (Ctrl+Enter / Cmd+Enter)
-    document.addEventListener('keydown', (e) => {
-      if (!isExtensionValid()) return;
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        triggerSubmissionDetection();
-      }
-    });
-
-    // Sync profile stats on initial load without firing phantom victory toasts
-    syncLeetCodeProfileStats();
-  }
-
-  // Start observing when page is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', observeSubmissions);
-  } else {
-    observeSubmissions();
-  }
-
-  // Also sync profile after a short delay
-  setTimeout(syncLeetCodeProfileStats, 1500);
-
-  // Listen for broadcast alerts from background or popup
-  try {
-    if (typeof chrome !== 'undefined' && chrome?.runtime?.onMessage) {
-      chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-        if (msg.type === 'SHOW_INPAGE_NOTIFICATION') {
-          showInPageAlert(msg.title, msg.message);
-          sendResponse({ received: true });
-        }
+      chrome.runtime.sendMessage(message, res => {
+        if (chrome.runtime.lastError || !res?.success || res.duplicate) return;
+        showSolveToast(res);
+        refreshCompanion();
       });
-    }
-  } catch (e) {}
+    } catch { /* extension reloaded */ }
+  }
 
-    function showInPageAlert(title, message) {
-      const existing = document.getElementById('leetsync-inpage-alert');
-      if (existing) existing.remove();
+  function isSubmitButton(btn) {
+    return btn.dataset.e2eLocator === 'console-submit-button' || (btn.textContent || '').trim() === 'Submit';
+  }
 
-      const banner = document.createElement('div');
-      banner.id = 'leetsync-inpage-alert';
-      banner.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 9999999;
-        background: #0F172A;
-        color: #FFFFFF;
-        border: 1px solid #334155;
-        border-radius: 10px;
-        padding: 12px 16px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        max-width: 320px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        animation: leetsyncSlideIn 0.3s ease;
-      `;
-      banner.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-          <span style="font-size: 13px; font-weight: 700; color: #38BDF8;">${title || 'LeetX'}</span>
-          <button id="leetsync-alert-close" style="background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 16px; line-height: 1;">&times;</button>
-        </div>
-        <div style="font-size: 12px; color: #E2E8F0; line-height: 1.35;">${message || ''}</div>
-      `;
-      document.body.appendChild(banner);
-      document.getElementById('leetsync-alert-close')?.addEventListener('click', () => banner.remove());
-      setTimeout(() => { if (document.body.contains(banner)) banner.remove(); }, 6000);
+  document.addEventListener('click', e => {
+    const btn = e.target instanceof Element ? e.target.closest('button') : null;
+    if (btn && isSubmitButton(btn)) startWatching();
+  }, true);
+
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && currentSlug()) startWatching();
+  }, true);
+
+  new MutationObserver(() => { if (watching) checkResult(); })
+    .observe(document.documentElement, { childList: true, subtree: true });
+
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (sender.id !== chrome.runtime.id) return false;
+    if (msg?.type === 'SHOW_INPAGE_NOTIFICATION') {
+      showAlert(String(msg.title || ''), String(msg.message || ''));
+      sendResponse({ ok: true });
     }
-  })();
+    return false;
+  });
+})();

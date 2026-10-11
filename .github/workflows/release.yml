@@ -1,0 +1,80 @@
+name: CI & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: npm ci
+
+      - name: Syntax check
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Security rules + multiplayer e2e (Firestore emulator)
+        env:
+          CI: 'true'
+        run: npx firebase emulators:exec --only firestore --project demo-leetx "node --test tests/firestore.rules.test.mjs && node --test tests/e2e_full_suite.mjs"
+
+      - name: Package structure tests
+        run: python -m unittest discover -s tests -p "test_*.py"
+
+  release:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Tag must match manifest version
+        run: |
+          MANIFEST_VERSION=$(python -c "import json; print(json.load(open('manifest.json'))['version'])")
+          if [ "v${MANIFEST_VERSION}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match manifest version ${MANIFEST_VERSION}"
+            exit 1
+          fi
+
+      - name: Package extensions
+        run: python scripts/package.py
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/leetx-chrome-v*.zip
+            dist/leetx-firefox-v*.zip
+            dist/leetx-chrome.zip
+            dist/leetx-firefox.zip
+          generate_release_notes: true

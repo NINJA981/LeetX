@@ -1,90 +1,106 @@
+"""Build store-ready Chrome and Firefox packages into dist/.
+
+Usage:
+    python scripts/package.py            # package the current version
+    python scripts/package.py patch      # bump patch (or minor / major), then package
+    python scripts/package.py --copy-to-downloads
+    python scripts/package.py --out some/dir
+"""
 import json
-import zipfile
-import shutil
 import os
+import shutil
 import sys
+import zipfile
 from pathlib import Path
 
-def package_extension(bump=None):
-    root_dir = Path(__file__).resolve().parent.parent
-    manifest_file = root_dir / 'manifest.json'
+ROOT = Path(__file__).resolve().parent.parent
+DIST = ROOT / 'dist'
 
-    with open(manifest_file, 'r', encoding='utf-8') as f:
-        manifest = json.load(f)
+# Only what the extension needs at runtime ships in the zip.
+RUNTIME_DIRS = ['popup', 'styles', 'assets']
+RUNTIME_SCRIPTS = ['background.js', 'content.js', 'core.js', 'firebase.js', 'github.js', 'leetcode.js', 'state.js']
+EXCLUDED_SUFFIXES = {'.map', '.md', '.py', '.pyc'}
 
-    if bump:
-        parts = [int(p) for p in manifest.get('version', '1.0.0').split('.')]
-        if bump == 'patch':
-            parts[-1] += 1
-        elif bump == 'minor':
-            parts[1] += 1
-            parts[2] = 0
-        elif bump == 'major':
-            parts[0] += 1
-            parts[1] = 0
-            parts[2] = 0
-        manifest['version'] = '.'.join(str(p) for p in parts)
-        with open(manifest_file, 'w', encoding='utf-8') as f:
-            json.dump(manifest, f, indent=2)
+
+def bump(version: str, part: str) -> str:
+    major, minor, patch = (int(p) for p in version.split('.'))
+    if part == 'major':
+        return f'{major + 1}.0.0'
+    if part == 'minor':
+        return f'{major}.{minor + 1}.0'
+    return f'{major}.{minor}.{patch + 1}'
+
+
+def runtime_files():
+    for name in RUNTIME_SCRIPTS:
+        path = ROOT / 'scripts' / name
+        if not path.is_file():
+            raise SystemExit(f'missing runtime script: {path}')
+        yield path
+    for folder in RUNTIME_DIRS:
+        for path in sorted((ROOT / folder).rglob('*')):
+            if path.is_file() and not path.name.startswith('.') and path.suffix not in EXCLUDED_SUFFIXES:
+                yield path
+
+
+def chrome_manifest(manifest: dict) -> dict:
+    out = json.loads(json.dumps(manifest))
+    out.pop('browser_specific_settings', None)
+    out['background'] = {'service_worker': 'scripts/background.js', 'type': 'module'}
+    return out
+
+
+def firefox_manifest(manifest: dict) -> dict:
+    out = json.loads(json.dumps(manifest))
+    out.pop('minimum_chrome_version', None)
+    out['background'] = {'scripts': ['scripts/background.js'], 'type': 'module'}
+    return out
+
+
+def write_zip(path: Path, manifest: dict):
+    with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as z:
+        z.writestr('manifest.json', json.dumps(manifest, indent=2) + '\n')
+        for file in runtime_files():
+            z.write(file, arcname=file.relative_to(ROOT).as_posix())
+
+
+def main(argv):
+    manifest_path = ROOT / 'manifest.json'
+    manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+
+    part = next((a for a in argv if a in ('patch', 'minor', 'major')), None)
+    if part:
+        manifest['version'] = bump(manifest['version'], part)
+        manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+        package_json = ROOT / 'package.json'
+        if package_json.exists():
+            pkg = json.loads(package_json.read_text(encoding='utf-8'))
+            pkg['version'] = manifest['version']
+            package_json.write_text(json.dumps(pkg, indent=2) + '\n', encoding='utf-8')
         print(f"Bumped version to {manifest['version']}")
 
-    version = manifest.get('version', '1.1.2')
-    dist_dir = root_dir / 'dist'
-    dist_dir.mkdir(parents=True, exist_ok=True)
-
-    items = ['manifest.json', 'popup', 'scripts', 'styles', 'assets', 'README.md', 'firebase.json', 'firestore.rules', '.firebaserc']
-    downloads = Path(os.environ.get('USERPROFILE', 'C:/Users/saich')) / 'Downloads'
-
-    # 1. Package Chrome / Standard MV3 Distribution
-    chrome_zip_path = dist_dir / f'leetx-v{version}.zip'
-    with zipfile.ZipFile(chrome_zip_path, 'w', zipfile.ZIP_DEFLATED) as z:
-        for item in items:
-            p = root_dir / item
-            if p.is_file():
-                z.write(p, arcname=item)
-            elif p.is_dir():
-                for f in p.rglob('*'):
-                    if f.is_file() and not f.name.startswith('.'):
-                        z.write(f, arcname=str(f.relative_to(root_dir)))
-
-    if downloads.exists():
-        target_chrome = downloads / f'leetx-v{version}.zip'
-        shutil.copy2(chrome_zip_path, target_chrome)
-        shutil.copy2(chrome_zip_path, downloads / 'leetx.zip')
-        # Also copy legacy name for compatibility
-        shutil.copy2(chrome_zip_path, downloads / f'leetsync-squads-v{version}.zip')
-        print(f"Copied Chrome package to {target_chrome}")
-
-    # 2. Package Firefox AMO MV3 Distribution (with background.scripts fallback)
-    firefox_manifest = dict(manifest)
-    firefox_manifest['background'] = {
-        'service_worker': 'scripts/background.js',
-        'scripts': ['scripts/background.js'],
-        'type': 'module'
+    version = manifest['version']
+    dist = Path(argv[argv.index('--out') + 1]).resolve() if '--out' in argv else DIST
+    dist.mkdir(parents=True, exist_ok=True)
+    outputs = {
+        dist / f'leetx-chrome-v{version}.zip': chrome_manifest(manifest),
+        dist / f'leetx-firefox-v{version}.zip': firefox_manifest(manifest),
     }
-    firefox_zip_path = dist_dir / f'leetx-firefox-v{version}.zip'
-    with zipfile.ZipFile(firefox_zip_path, 'w', zipfile.ZIP_DEFLATED) as z:
-        z.writestr('manifest.json', json.dumps(firefox_manifest, indent=2))
-        for item in items:
-            if item == 'manifest.json':
-                continue
-            p = root_dir / item
-            if p.is_file():
-                z.write(p, arcname=item)
-            elif p.is_dir():
-                for f in p.rglob('*'):
-                    if f.is_file() and not f.name.startswith('.'):
-                        z.write(f, arcname=str(f.relative_to(root_dir)))
+    for path, mf in outputs.items():
+        write_zip(path, mf)
+        print(f'Packaged {path} ({path.stat().st_size // 1024} KB)')
 
-    if downloads.exists():
-        target_ff = downloads / f'leetx-firefox-v{version}.zip'
-        shutil.copy2(firefox_zip_path, target_ff)
-        print(f"Copied Firefox package to {target_ff}")
+    # Stable names so install scripts can use releases/latest/download/<name>.
+    shutil.copyfile(dist / f'leetx-chrome-v{version}.zip', dist / 'leetx-chrome.zip')
+    shutil.copyfile(dist / f'leetx-firefox-v{version}.zip', dist / 'leetx-firefox.zip')
 
-    print(f"Successfully packaged Chrome -> {chrome_zip_path}")
-    print(f"Successfully packaged Firefox -> {firefox_zip_path}")
-    return chrome_zip_path
+    if '--copy-to-downloads' in argv and not os.environ.get('CI'):
+        downloads = Path.home() / 'Downloads'
+        if downloads.is_dir():
+            for path in outputs:
+                shutil.copy2(path, downloads / path.name)
+            print(f'Copied packages to {downloads}')
+
 
 if __name__ == '__main__':
-    bump_type = sys.argv[1] if len(sys.argv) > 1 else None
-    package_extension(bump_type)
+    main(sys.argv[1:])

@@ -1,19 +1,248 @@
 rules_version = '2';
+
+// LeetX Squads security rules.
+// Every client signs in with Firebase Anonymous Auth; request.auth.uid is the
+// only identity trusted here. Display names are cosmetic and never authorize.
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Squad rooms — public read/write scoped to squad documents
-    match /squads/{roomCode} {
-      allow read: if true;
-      allow write: if request.resource.data.keys().hasAny(['members', 'activityFeed', 'challenge', 'lastActive', 'code', 'createdAt', 'owner', 'leader']);
+
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+
+    function squadPath(code) { return /databases/$(database)/documents/squads/$(code); }
+    function memberPath(code, uid) { return /databases/$(database)/documents/squads/$(code)/members/$(uid); }
+    function duelPath(id) { return /databases/$(database)/documents/duels/$(id); }
+
+    function isMember(code) { return signedIn() && exists(memberPath(code, me())); }
+    function squadData(code) { return get(squadPath(code)).data; }
+    function isOwner(code) { return signedIn() && squadData(code).ownerUid == me(); }
+
+    function str(v, max) { return v is string && v.size() > 0 && v.size() <= max; }
+    function count(v) { return v is int && v >= 0 && v <= 1000000; }
+    function recent(t) {
+      // Client clocks may drift; allow five minutes either way.
+      return t is int
+        && t > request.time.toMillis() - 300000
+        && t < request.time.toMillis() + 300000;
+    }
+    function optStr(d, k, max) { return !(k in d) || d[k] == null || str(d[k], max); }
+    function optInt(d, k) { return !(k in d) || d[k] == null || count(d[k]); }
+
+    function validChallenge(c) {
+      return c is map
+        && c.keys().hasAll(['key', 'id', 'title', 'target', 'rewardXp', 'category', 'startedAt'])
+        && c.keys().hasOnly(['key', 'id', 'title', 'target', 'rewardXp', 'category', 'roadmapCategory', 'startedAt'])
+        && str(c.key, 40) && str(c.id, 80) && str(c.title, 120) && str(c.category, 60)
+        && optStr(c, 'roadmapCategory', 60)
+        && c.target is int && c.target > 0 && c.target <= 50
+        && c.rewardXp is int && c.rewardXp >= 0 && c.rewardXp <= 1000
+        && c.startedAt is int;
     }
 
-    // 1v1 Duel matches — public read/write scoped to duel documents
+    function validNewSquad(code, d) {
+      return d.keys().hasAll(['schema', 'code', 'ownerUid', 'ownerName', 'createdAt', 'lastActive', 'challenge', 'completedChallenges', 'squadXp', 'bannedUids'])
+        && d.keys().hasOnly(['schema', 'code', 'ownerUid', 'ownerName', 'createdAt', 'lastActive', 'challenge', 'completedChallenges', 'squadXp', 'bannedUids'])
+        && d.schema == 2
+        && d.code == code
+        && d.ownerUid == me()
+        && str(d.ownerName, 40)
+        && recent(d.createdAt) && recent(d.lastActive)
+        && validChallenge(d.challenge)
+        && d.completedChallenges == 0
+        && d.squadXp == 0
+        && d.bannedUids == [];
+    }
+
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    // ---------- squads ----------
+    match /squads/{code} {
+      // Codes are the invite secret: anyone signed in may look one up, nobody may enumerate.
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && code.matches('^[A-Z0-9]{4,12}$')
+        && validNewSquad(code, request.resource.data);
+
+      // v1 squads had no ownerUid: the first v2 client to open one migrates it and becomes owner.
+      allow update: if signedIn()
+        && !('ownerUid' in resource.data)
+        && validNewSquad(code, request.resource.data);
+
+      // Owner: transfer ownership (only to an existing member), ban list, reroll.
+      allow update: if 'ownerUid' in resource.data
+        && resource.data.ownerUid == me()
+        && changed().hasOnly(['ownerUid', 'ownerName', 'bannedUids', 'challenge', 'lastActive'])
+        && str(request.resource.data.ownerName, 40)
+        && exists(memberPath(code, request.resource.data.ownerUid))
+        && request.resource.data.bannedUids is list
+        && request.resource.data.bannedUids.size() <= 200
+        && !(request.resource.data.ownerUid in request.resource.data.bannedUids)
+        && validChallenge(request.resource.data.challenge)
+        && request.resource.data.lastActive is int;
+
+      // Any member: heartbeat, or rotate a completed challenge (exactly one completion per rotation).
+      allow update: if 'ownerUid' in resource.data
+        && isMember(code)
+        && (
+          changed().hasOnly(['lastActive'])
+          || (
+            changed().hasOnly(['challenge', 'completedChallenges', 'squadXp', 'lastActive'])
+            && request.resource.data.challenge.id != resource.data.challenge.id
+            && validChallenge(request.resource.data.challenge)
+            && request.resource.data.completedChallenges == resource.data.completedChallenges + 1
+            && request.resource.data.squadXp == resource.data.squadXp + resource.data.challenge.rewardXp
+          )
+        )
+        && request.resource.data.lastActive is int;
+
+      allow delete: if isOwner(code);
+
+      // ---------- members ----------
+      function validMember(uid, d) {
+        return d.keys().hasAll(['uid', 'name', 'streak', 'todaySolved', 'todayDate', 'totalSolved', 'xp', 'joinedAt', 'lastActive'])
+          && d.keys().hasOnly(['uid', 'name', 'streak', 'todaySolved', 'todayDate', 'totalSolved', 'xp', 'joinedAt', 'lastActive'])
+          && d.uid == uid
+          && str(d.name, 40)
+          && count(d.streak) && count(d.todaySolved) && count(d.totalSolved) && count(d.xp)
+          && d.todayDate is string && d.todayDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && d.joinedAt is int
+          && d.lastActive is int;
+      }
+
+      match /members/{uid} {
+        allow get: if signedIn() && (uid == me() || isMember(code));
+        allow list: if isMember(code);
+
+        allow create: if signedIn()
+          && uid == me()
+          && exists(squadPath(code))
+          && 'ownerUid' in squadData(code)
+          && !(me() in squadData(code).bannedUids)
+          && validMember(uid, request.resource.data)
+          && recent(request.resource.data.joinedAt);
+
+        allow update: if signedIn()
+          && uid == me()
+          && validMember(uid, request.resource.data)
+          && request.resource.data.joinedAt == resource.data.joinedAt;
+
+        allow delete: if signedIn() && (uid == me() || isOwner(code));
+      }
+
+      // ---------- activity feed (append-only) ----------
+      function validProblem(p) {
+        return p is map
+          && p.keys().hasOnly(['id', 'title', 'slug', 'difficulty'])
+          && p.id is string && p.id.size() <= 10
+          && str(p.title, 120)
+          && p.slug is string && p.slug.size() <= 120
+          && p.difficulty in ['Easy', 'Medium', 'Hard'];
+      }
+
+      function validEvent(d) {
+        return d.keys().hasAll(['type', 'actorUid', 'actorName', 'createdAt', 'expireAt'])
+          && d.keys().hasOnly(['type', 'actorUid', 'actorName', 'targetUid', 'targetName', 'problem', 'challengeId', 'challengeTitle', 'rewardXp', 'streak', 'duelId', 'createdAt', 'expireAt'])
+          && d.type in ['join', 'leave', 'kick', 'nudge', 'solve', 'challenge_complete', 'challenge_reroll', 'duel_challenge', 'duel_accepted', 'duel_result', 'duel_forfeit']
+          && d.actorUid == me()
+          && str(d.actorName, 40)
+          && recent(d.createdAt)
+          && d.expireAt is timestamp
+          && optStr(d, 'targetUid', 128)
+          && optStr(d, 'targetName', 40)
+          && optStr(d, 'challengeId', 80)
+          && optStr(d, 'challengeTitle', 120)
+          && optStr(d, 'duelId', 64)
+          && optInt(d, 'rewardXp')
+          && optInt(d, 'streak')
+          && (!('problem' in d) || validProblem(d.problem))
+          // Kicks are owner-only; nudges and duel notices must target a real member.
+          && (d.type != 'kick' || isOwner(code))
+          && (!(d.type in ['nudge', 'kick', 'duel_challenge', 'duel_accepted']) || ('targetUid' in d && d.targetUid != me()));
+      }
+
+      match /events/{eventId} {
+        allow read: if isMember(code);
+        allow create: if isMember(code) && validEvent(request.resource.data);
+        allow update: if false;
+        allow delete: if isOwner(code);
+      }
+    }
+
+    // ---------- duels ----------
     match /duels/{duelId} {
-      allow read: if true;
-      allow write: if request.resource.data.keys().hasAny(['id', 'roomCode', 'challenger', 'opponent', 'status', 'problem', 'format', 'winner', 'loser', 'startedAt', 'finishedAt', 'createdAt', 'revealed', 'runtime']);
+      function isPlayer(d) { return signedIn() && (me() == d.challengerUid || me() == d.opponentUid); }
+
+      function validNewDuel(d) {
+        return d.keys().hasOnly(['squadCode', 'challengerUid', 'challengerName', 'opponentUid', 'opponentName', 'format', 'difficulty', 'category', 'status', 'createdAt', 'acceptedAt', 'finishedAt', 'winnerUid', 'winnerName', 'runtime', 'expireAt'])
+          && d.challengerUid == me()
+          && str(d.opponentUid, 128) && d.opponentUid != me()
+          && str(d.challengerName, 40) && str(d.opponentName, 40)
+          && str(d.squadCode, 12)
+          && exists(memberPath(d.squadCode, me()))
+          && exists(memberPath(d.squadCode, d.opponentUid))
+          && str(d.format, 40)
+          && d.difficulty in ['Easy', 'Medium', 'Hard']
+          && d.category is string && d.category.size() <= 60
+          && d.status == 'pending'
+          && recent(d.createdAt)
+          && d.acceptedAt == null && d.finishedAt == null
+          && d.winnerUid == null && d.winnerName == null && d.runtime == null
+          && d.expireAt is timestamp;
+      }
+
+      function validTransition(before, after) {
+        return (
+            // opponent accepts or declines a pending invite
+            me() == before.opponentUid && before.status == 'pending'
+            && ((after.status == 'active' && recent(after.acceptedAt)) || (after.status == 'declined' && recent(after.finishedAt)))
+            && after.winnerUid == null
+          ) || (
+            // challenger withdraws a pending invite
+            me() == before.challengerUid && before.status == 'pending'
+            && after.status == 'cancelled' && recent(after.finishedAt) && after.winnerUid == null
+          ) || (
+            // first accepted solve wins
+            before.status == 'active' && after.status == 'completed'
+            && after.winnerUid == me() && str(after.winnerName, 40) && recent(after.finishedAt)
+            && (after.runtime == null || (after.runtime is string && after.runtime.size() <= 20))
+          ) || (
+            // forfeiting hands the win to the other player
+            before.status == 'active' && after.status == 'forfeited'
+            && after.winnerUid != me() && after.winnerUid in [before.challengerUid, before.opponentUid]
+            && str(after.winnerName, 40) && recent(after.finishedAt)
+          );
+      }
+
+      allow read: if isPlayer(resource.data);
+      allow create: if signedIn() && validNewDuel(request.resource.data);
+      allow update: if isPlayer(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedAt', 'finishedAt', 'winnerUid', 'winnerName', 'runtime'])
+        && validTransition(resource.data, request.resource.data);
+      allow delete: if false;
+
+      // The problem stays hidden from the opponent until they accept.
+      match /secret/{docId} {
+        allow create: if signedIn()
+          && docId == 'problem'
+          && getAfter(duelPath(duelId)).data.challengerUid == me()
+          && request.resource.data.keys().hasOnly(['id', 'title', 'slug', 'difficulty', 'category'])
+          && request.resource.data.id is string && request.resource.data.id.size() <= 10
+          && str(request.resource.data.title, 120)
+          && str(request.resource.data.slug, 120)
+          && request.resource.data.difficulty in ['Easy', 'Medium', 'Hard']
+          && request.resource.data.category is string && request.resource.data.category.size() <= 60;
+        allow read: if signedIn() && (
+          get(duelPath(duelId)).data.challengerUid == me()
+          || (get(duelPath(duelId)).data.opponentUid == me()
+              && get(duelPath(duelId)).data.status in ['active', 'completed', 'forfeited'])
+        );
+        allow update, delete: if false;
+      }
     }
 
-    // Deny all other collections
     match /{document=**} {
       allow read, write: if false;
     }

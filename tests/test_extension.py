@@ -1,128 +1,112 @@
+"""Static checks on the extension package: manifest, datasets, packaging."""
 import json
 import re
+import subprocess
+import sys
+import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
 
-class TestExtensionStructure(unittest.TestCase):
+
+def load_json(rel):
+    with open(ROOT / rel, encoding="utf-8") as f:
+        return json.load(f)
+
+
+class TestManifest(unittest.TestCase):
     def setUp(self):
-        self.ext_dir = Path(".")
+        self.manifest = load_json("manifest.json")
 
-    def test_manifest_validity(self):
-        manifest_path = self.ext_dir / "manifest.json"
-        self.assertTrue(manifest_path.is_file(), "manifest.json must exist")
+    def test_mv3_basics(self):
+        m = self.manifest
+        self.assertEqual(m["manifest_version"], 3)
+        self.assertRegex(m["version"], r"^\d+\.\d+\.\d+$")
+        self.assertEqual(m["background"]["service_worker"], "scripts/background.js")
+        self.assertEqual(m["background"]["type"], "module")
 
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = json.load(f)
+    def test_least_privilege(self):
+        perms = set(self.manifest["permissions"])
+        self.assertEqual(perms, {"storage", "alarms", "notifications", "cookies"})
+        hosts = self.manifest["host_permissions"]
+        self.assertNotIn("<all_urls>", hosts)
+        self.assertTrue(all(h.startswith("https://") for h in hosts))
+        self.assertIn("https://firestore.googleapis.com/*", hosts)
 
-        self.assertEqual(manifest.get("manifest_version"), 3)
-        self.assertIn("storage", manifest.get("permissions", []))
-        self.assertIn("identity", manifest.get("permissions", []))
-        self.assertIn("alarms", manifest.get("permissions", []))
-        self.assertIn("notifications", manifest.get("permissions", []))
-        self.assertTrue(manifest.get("background", {}).get("service_worker"))
+    def test_only_overlay_css_is_web_accessible(self):
+        resources = [r for entry in self.manifest["web_accessible_resources"] for r in entry["resources"]]
+        self.assertEqual(resources, ["styles/content.css"])
 
-        # Verify host permissions for Firestore
-        host_perms = manifest.get("host_permissions", [])
-        self.assertTrue(
-            any("firestore.googleapis.com" in p for p in host_perms),
-            "Firestore host permission must be included in manifest",
-        )
+    def test_icons_exist(self):
+        for rel in self.manifest["icons"].values():
+            self.assertTrue((ROOT / rel).is_file(), rel)
 
-        # Verify icons exist
-        icons = manifest.get("icons", {})
-        for size, rel_path in icons.items():
-            icon_file = self.ext_dir / rel_path
-            self.assertTrue(icon_file.is_file(), f"Icon {rel_path} must exist")
+    def test_firefox_id_is_stable(self):
+        gecko = self.manifest["browser_specific_settings"]["gecko"]
+        self.assertEqual(gecko["id"], "leetx-squads@ninja981.github.io")
+        self.assertNotIn("none", gecko["data_collection_permissions"]["required"])
 
-    def test_blind75_dataset(self):
-        dataset_path = self.ext_dir / "assets" / "data" / "blind75.json"
-        self.assertTrue(dataset_path.is_file())
 
-        with open(dataset_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+class TestDatasets(unittest.TestCase):
+    def check(self, rel, minimum):
+        data = load_json(rel)
+        self.assertGreaterEqual(len(data), minimum)
+        slugs = [p["slug"] for p in data]
+        self.assertEqual(len(slugs), len(set(slugs)), "duplicate slugs")
+        for p in data:
+            self.assertTrue({"id", "title", "slug", "difficulty", "category"} <= p.keys())
+            self.assertIn(p["difficulty"], {"Easy", "Medium", "Hard"})
+            self.assertRegex(p["slug"], r"^[a-z0-9-]+$")
 
-        self.assertGreaterEqual(len(data), 75)
-        for item in data:
-            self.assertIn("id", item)
-            self.assertIn("title", item)
-            self.assertIn("slug", item)
-            self.assertIn("difficulty", item)
-            self.assertIn("category", item)
+    def test_blind75(self):
+        self.check("assets/data/blind75.json", 75)
 
-    def test_neetcode150_dataset(self):
-        dataset_path = self.ext_dir / "assets" / "data" / "neetcode150.json"
-        self.assertTrue(dataset_path.is_file())
+    def test_neetcode150(self):
+        self.check("assets/data/neetcode150.json", 150)
 
-        with open(dataset_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
 
-        self.assertGreaterEqual(len(data), 150)
-        for item in data:
-            self.assertIn("id", item)
-            self.assertIn("title", item)
-            self.assertIn("slug", item)
-            self.assertIn("difficulty", item)
-            self.assertIn("category", item)
+class TestSourceHygiene(unittest.TestCase):
+    """Remote data must never be rendered as HTML."""
 
-    def test_popup_and_scripts_exist(self):
-        required_files = [
-            "popup/index.html",
-            "popup/style.css",
-            "popup/app.js",
-            "scripts/background.js",
-            "scripts/content.js",
-            "scripts/github.js",
-            "scripts/leetcode.js",
-            "scripts/firebase.js",
-            "styles/content.css",
-            "firestore.rules",
-            "firebase.json",
-            "README.md",
-        ]
-        for rel in required_files:
-            file_path = self.ext_dir / rel
-            self.assertTrue(file_path.is_file(), f"{rel} must exist")
+    UI_FILES = ["scripts/content.js", "popup/app.js", "popup/ui.js"] + [
+        str(p.relative_to(ROOT)) for p in (ROOT / "popup/views").glob("*.js")
+    ]
 
-    def test_room_code_format(self):
-        """Test that room codes generated follow the 6-character unambiguous rule."""
-        charset = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
-        # Verify forbidden characters are not in charset
-        for forbidden in ["0", "O", "1", "I"]:
-            self.assertNotIn(forbidden, charset)
+    def test_no_html_sinks(self):
+        sink = re.compile(r"\.(innerHTML|outerHTML)\s*=|insertAdjacentHTML|document\.write|\beval\(|new Function\(")
+        for rel in self.UI_FILES:
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIsNone(sink.search(text), f"HTML sink in {rel}")
 
-        # Test code format regex
-        valid_code = "K9X2P4"
-        self.assertEqual(len(valid_code), 6)
-        self.assertTrue(re.match(r"^[2-9A-HJ-NP-Z]{6}$", valid_code))
+    def test_no_inline_scripts_in_popup(self):
+        html = (ROOT / "popup/index.html").read_text(encoding="utf-8")
+        self.assertNotRegex(html, r"<script(?![^>]*\bsrc=)")
+        self.assertNotRegex(html, r"\son[a-z]+=")
 
-    def test_duel_schema_structure(self):
-        """Test duel match object schema requirements."""
-        duel_mock = {
-            "id": "duel_1740000000_abc12",
-            "roomCode": "ALGO99",
-            "challenger": "NINJA981",
-            "opponent": "Alex_Dev",
-            "format": "random_blind75",
-            "problem": {
-                "id": 1,
-                "title": "Two Sum",
-                "slug": "two-sum",
-                "difficulty": "Easy",
-            },
-            "status": "pending",
-            "createdAt": 1740000000,
-            "startedAt": None,
-            "finishedAt": None,
-            "winner": None,
-        }
-        self.assertIn("id", duel_mock)
-        self.assertIn("roomCode", duel_mock)
-        self.assertIn("challenger", duel_mock)
-        self.assertIn("opponent", duel_mock)
-        self.assertIn("problem", duel_mock)
-        self.assertIn("status", duel_mock)
-        self.assertIn(duel_mock["status"], ["pending", "active", "completed", "forfeited", "declined"])
+
+class TestPackaging(unittest.TestCase):
+    def test_package_contents(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env_dist = Path(tmp)
+            subprocess.run([sys.executable, str(ROOT / "scripts/package.py"), "--out", str(env_dist)], check=True, capture_output=True)
+            version = load_json("manifest.json")["version"]
+
+            with zipfile.ZipFile(env_dist / f"leetx-chrome-v{version}.zip") as z:
+                names = set(z.namelist())
+                chrome = json.loads(z.read("manifest.json"))
+            self.assertNotIn("browser_specific_settings", chrome)
+            self.assertNotIn("scripts", chrome["background"])
+            for required in ["popup/index.html", "popup/app.js", "popup/views/today.js", "scripts/core.js", "styles/content.css", "assets/data/blind75.json"]:
+                self.assertIn(required, names)
+            for forbidden in ["scripts/package.py", "firestore.rules", ".firebaserc", "README.md", "package.json"]:
+                self.assertNotIn(forbidden, names)
+
+            with zipfile.ZipFile(env_dist / f"leetx-firefox-v{version}.zip") as z:
+                firefox = json.loads(z.read("manifest.json"))
+            self.assertEqual(firefox["background"], {"scripts": ["scripts/background.js"], "type": "module"})
+            self.assertIn("gecko", firefox["browser_specific_settings"])
 
 
 if __name__ == "__main__":

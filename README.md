@@ -1,183 +1,96 @@
-# ⚡ LeetX Squads — Browser Extension
+# LeetX Squads
 
-<div align="center">
+A browser extension that turns LeetCode practice into a daily habit you keep with friends.
 
-![Manifest V3](https://img.shields.io/badge/Manifest-V3-brightgreen.svg?style=for-the-badge)
-![Browsers](https://img.shields.io/badge/Browsers-Chrome%20%7C%20Brave%20%7C%20Edge%20%7C%20Arc%20%7C%20Firefox-blue.svg?style=for-the-badge)
-![Multiplayer](https://img.shields.io/badge/Multiplayer-Firebase%20Firestore-orange.svg?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-purple.svg?style=for-the-badge)
+![Manifest V3](https://img.shields.io/badge/Manifest-V3-brightgreen) ![Chrome · Edge · Brave · Arc · Firefox](https://img.shields.io/badge/browsers-Chrome%20%C2%B7%20Edge%20%C2%B7%20Brave%20%C2%B7%20Arc%20%C2%B7%20Firefox-blue)
 
-**The ultimate companion extension for LeetCode.**  
-Automatic GitHub backup with authentic performance metrics, interactive Blind 75 & NeetCode 150 roadmaps, daily streak gamification, and real-time multiplayer Squad Rooms with live 1v1 speed duels.
+- **Streaks that stick.** Your streak lives on the toolbar icon. It turns amber when today isn't done and red in the last three hours, and one evening reminder arrives only if you haven't solved yet.
+- **Streak freezes.** You earn one every 7 streak days (up to 2). If you miss a day, a freeze covers it automatically, so one bad day doesn't erase a month of work.
+- **A companion on LeetCode.** A small pill on every problem page shows your streak and a solve timer that only counts while the tab is visible. It also opens a notes panel that's synced to GitHub. The confirmation after an accepted solve shows your time, personal bests, freezes and achievements.
+- **Smart reviews.** New Medium and Hard solves come back for review after 3 days. Rate each one *Got it* or *Again* and the gaps grow (3 → 8 → 20 → 50 days). Re-solving a due problem counts as the review.
+- **Progress.** Topic mastery with a "focus next" pick that follows NeetCode order, median solve times by difficulty, this week vs last, a 6-month activity heatmap and 21 achievements.
+- **Squads.** Share a 6-character code. You'll see who has solved today, nudge whoever hasn't, and clear rotating team challenges together.
+- **1v1 duels.** Race a squadmate on the same hidden problem. It's revealed when they accept, and the first accepted submission wins.
+- **GitHub backup.** Every accepted solution is committed to a repo you own (private by default), with runtime, memory and your notes, plus a README catalog. A one-click sync backfills your full history.
+- **Roadmaps.** Blind 75 and NeetCode 150, with progress per topic and notes per problem.
+- **Rhythm.** A reminder about 30 minutes before each LeetCode contest, and a Sunday-evening recap of your week. Both can be turned off.
 
-</div>
+Keyboard shortcuts in the popup: `1`–`4` switch tabs, `/` searches the roadmap, `,` opens settings.
 
----
+## Install
 
-## 💻 Step-by-Step Setup Guide on Your Laptop
+**Download a release** (recommended):
 
-Follow these simple instructions to install and configure **LeetX Squads** on your laptop in under 2 minutes.
+| Browser | Package |
+| --- | --- |
+| Chrome, Edge, Brave, Arc | [leetx-chrome.zip](https://github.com/NINJA981/LeetX/releases/latest/download/leetx-chrome.zip) |
+| Firefox | [leetx-firefox.zip](https://github.com/NINJA981/LeetX/releases/latest/download/leetx-firefox.zip) |
 
----
+Unzip it, open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick the folder.
+On Firefox, open `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → choose `manifest.json`.
 
-### Step 1: Download or Clone the Extension
+**Or use the installer**, which fetches the latest release and copies the folder path to your clipboard:
 
-#### Option A: Clone with Git (Recommended for Developers)
-Open your terminal (PowerShell, Command Prompt, or Terminal) and run:
-```bash
-git clone https://github.com/NINJA981/leetsync-squads.git
-cd leetsync-squads
+```powershell
+# Windows
+irm https://raw.githubusercontent.com/NINJA981/LeetX/main/install.ps1 | iex
 ```
 
-#### Option B: Download the ZIP Package
-1. Download **`leetx-v1.1.2.zip`** from the [Releases page](https://github.com/NINJA981/leetsync-squads/releases) or the `dist/` folder.
-2. Extract the ZIP file into a folder on your computer (e.g. `Documents/leetx-squads`).
-
----
-
-### Step 2: Load into Your Browser
-
-#### For Chrome, Brave, Microsoft Edge, or Arc:
-1. Open your browser and navigate to the extensions page:
-   - **Chrome**: `chrome://extensions`
-   - **Brave**: `brave://extensions`
-   - **Edge**: `edge://extensions`
-   - **Arc**: Open Settings → Extensions
-2. Enable **Developer mode** using the toggle in the top-right corner.
-3. Click the **Load unpacked** button in the top-left corner.
-4. Select the project folder containing `manifest.json`.
-5. Click the puzzle icon 🧩 in your browser toolbar and **pin 📌 LeetX Squads** to your toolbar.
-
-#### For Mozilla Firefox:
-1. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
-2. Click **Load Temporary Add-on...**.
-3. Select the `manifest.json` file inside the project directory.
-
----
-
-### Step 3: 15-Second GitHub Authentication
-
-1. Click the **LeetX Squads** icon in your browser toolbar.
-2. On the welcome screen, click **`1. Open GitHub & Generate Token ↗`**.
-   - *This will open GitHub with the exact required scopes (`repo`) pre-selected.*
-3. Scroll down to the bottom of the GitHub page and click **Generate token**.
-4. Click the copy icon 📋 next to your new Personal Access Token (`ghp_...`).
-5. Return to the extension popup, paste your token into the field, and click **Unlock ⚡**.
-6. **LeetX Squads** will automatically verify your account, detect your username, and create a `leetcode-submissions` repository in your GitHub account!
-
----
-
-## 🌟 Key Features
-
-### 🐙 1. Instant Atomic GitHub Sync
-- Automatically commits every accepted LeetCode submission to your GitHub repository in real time.
-- Generates clean, difficulty-categorized directories (`0001-Two-Sum/`, `Easy/`, `Medium/`, `Hard/`).
-- Includes authentic runtime/memory benchmarks and community percentile rankings (e.g. `Beats 98.4%`).
-- Automatically updates a beautiful, Markdown problem catalog table in the repository root `README.md`.
-
-### 🔥 2. Daily Momentum & Streak Gamification
-- Tracks consecutive days of problem solving with authentic LeetCode calendar reconciliation.
-- Interactive 7-day visual momentum strip with animated checkmarks.
-- XP progression system rewarding consistency and challenge completions.
-
-### 🗺️ 3. Curated DSA Roadmaps (Blind 75 & NeetCode 150)
-- Practice the canonical **Blind 75** (75 problems) and **NeetCode 150** (150 problems) curricula.
-- Category filters: Arrays & Hashing, Two Pointers, Sliding Window, Trees, Graphs, Dynamic Programming, and more.
-- Deterministic **"Next For You"** recommendation engine directs you to your next unsolved milestone.
-- Personal problem approach notes & spaced repetition review reminders (+3d, +7d, +14d, +30d).
-
-### 👥 4. Real-Time Multiplayer Squad Rooms
-- Join or host private squad rooms with collision-free 6-character room codes (e.g. `#K9X2P4`).
-- Live squad leaderboard tracking friend streaks, daily solves, and XP.
-- **Squad Leader Controls**: The room creator has authority to manage members (`🚫 Kick`).
-- **25 Dynamic Squad Challenges**: Team-based goals (e.g., *"Solve 5 Tree problems"*) that auto-cycle upon completion.
-- **`👋 Nudge`**: Send real-time wake-up nudges to teammates to preserve squad streaks.
-
-### ⚔️ 5. 1v1 Live Problem Duels
-- Challenge squad mates to live coding speed races.
-- **Format Selectors**: Random Blind 75, NeetCode 150, Today's Daily Challenge, Speed Sprint (Easy), or Boss Fight (Hard).
-- **Concealed Problem Protocol**: The problem title and link remain locked (`🔒 Problem Hidden`) until **both** players accept, ensuring zero head starts.
-- **Instant Win Resolution**: The first player whose submission is accepted by LeetCode is declared the winner with +50 XP and recorded match history.
-
----
-
-## 🎮 How to Play Multiplayer Squads & 1v1 Duels
-
-### Creating a Squad Room
-1. In the extension popup, switch to the **Squad** tab.
-2. Click the **`+ New`** button.
-3. A unique 6-character room code will be generated (e.g., `#K9X2P4`), and you will be designated as the **Squad Leader 👑**.
-4. Click **`Copy`** to copy the room code and share it with your friends or study group!
-
-### Joining a Squad Room
-1. Open the **Squad** tab.
-2. Enter your friend's 6-character room code into the join input.
-3. Click **`Join`** to instantly connect to the live squad leaderboard and team challenges.
-
-### Starting a 1v1 Problem Race
-1. Switch to the **Duels** tab.
-2. Select an opponent from your squad members dropdown.
-3. Choose your format (e.g., *Blind 75 · Random Problem*).
-4. Click **`Start Duel Match`**.
-5. Your opponent will receive a desktop notification and challenge card.
-6. Once they click **`Accept ⚔️`**, the problem and direct LeetCode link are revealed simultaneously to both players, and the live timer starts ticking!
-
----
-
-## 🛠️ Local Development & Testing
-
-LeetX Squads comes with a comprehensive automated test suite.
-
-### Running Tests
-To run all 31 End-to-End (E2E) automated tests and verify all subsystems:
 ```bash
-# Run comprehensive E2E suite
-node tests/e2e_full_suite.js
-
-# Run live feature verification tests
-node scratch/feature_verification.js
-
-# Run structural Python unit tests
-python -m unittest tests/test_extension.py
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/NINJA981/LeetX/main/install.sh | bash
 ```
 
-### Packaging Release ZIPs
-To compile and package fresh release builds for Chrome and Firefox AMO:
+## Getting started
+
+1. Sign in to [leetcode.com](https://leetcode.com) in the same browser.
+2. Open the LeetX popup → **Get started**.
+3. *(Optional)* Connect GitHub: click **Open GitHub**, generate a token with the `repo` scope, and paste it. LeetX creates `leetcode-submissions` (private unless you switch it off) and backfills your accepted solutions. Fine-grained tokens work too if they have **Contents** and **Administration** write access.
+4. Solve something. You'll see a confirmation on the LeetCode page and your streak updates on the toolbar.
+
+## Privacy
+
+| Data | Where it goes |
+| --- | --- |
+| Your code, notes and runtime stats | Only to **your** GitHub repository, via `api.github.com` |
+| GitHub token | Stays in this browser's extension storage |
+| Display name, streak, solve counts, titles of problems you solve, duel results | Your squad, via Firebase. Only members of your squad can read it. |
+| Everything else (history, XP, notes, reviews) | Stays in this browser |
+
+Squads use Firebase Anonymous Auth, so there are no accounts and no email addresses. Turn off **Share my solves** in Settings to stop posting solves to your squad.
+
+## Development
+
+The extension ships as plain ES modules with no build step. Node, Java 21+ and Python are only needed for tests and packaging.
+
 ```bash
-python scripts/package.py
+npm install
+npm test                 # unit tests + package/structure checks
+npm run test:emulator    # security rules + multiplayer e2e on the Firestore emulator
+npm run package          # dist/leetx-chrome-vX.Y.Z.zip and dist/leetx-firefox-vX.Y.Z.zip
 ```
-*Output packages will be saved to `dist/leetx-v1.1.2.zip` and copied directly to your `Downloads` directory.*
 
----
+Load the repository folder directly with **Load unpacked** while developing. See [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit together, including the data model and security rules.
 
-## ❓ Troubleshooting & FAQ
+### Releasing
 
-<details>
-<summary><b>1. Why isn't my problem syncing automatically when I solve it?</b></summary>
-Make sure you are logged into your LeetCode account in the same browser session. LeetX Squads automatically detects accepted submissions upon the LeetCode "Accepted" result banner. You can also trigger a manual backfill from the Settings tab.
-</details>
+1. `python scripts/package.py minor` bumps `manifest.json` and `package.json`.
+2. Commit, then tag `vX.Y.Z` and push the tag. CI runs every test suite, checks that the tag matches the manifest, and attaches the zips to a GitHub Release.
 
-<details>
-<summary><b>2. How do I change my target repository name?</b></summary>
-Navigate to the <b>Settings</b> tab in the extension popup. Under the <b>GitHub Config</b> card, you can customize your repository name, default branch, or toggle difficulty subdirectories (e.g., <code>Easy/0001-Two-Sum/</code>).
-</details>
+### Deploying the backend
 
-<details>
-<summary><b>3. Do my squad mates need to be in the same network?</b></summary>
-No. Multiplayer Squad Rooms and 1v1 Duels are powered by Google Cloud Firestore, enabling real-time multiplayer synchronization across any location or device globally.
-</details>
+The rules and indexes in this repo are the source of truth for the `leetsync-squads-app` Firebase project:
 
-<details>
-<summary><b>4. Is my GitHub token secure?</b></summary>
-Yes. Your token is stored exclusively inside your browser's private <code>chrome.storage.local</code> sandbox and is only used to make direct, authenticated HTTPS requests to the official GitHub API (<code>api.github.com</code>). It is never transmitted to any third-party server.
-</details>
+```bash
+npx firebase deploy --only firestore:rules,firestore:indexes --project leetsync-squads-app
+```
 
----
+Anonymous sign-in must be enabled under **Firebase console → Authentication → Sign-in method**.
 
-## 📄 License
+## FAQ
 
-This project is open-source under the [MIT License](LICENSE).
+**A solve didn't register.** LeetX listens for LeetCode's "Accepted" result after you press **Submit** (or Ctrl/⌘+Enter) on a problem page. Make sure you're signed in to leetcode.com. Running **Sync now** in Settings catches anything that was missed.
 
-<div align="center">
-  <sub>Built with ❤️ for the competitive programming community • Powered by <b>LeetX Squads</b></sub>
-</div>
+**Does my streak match LeetCode's?** On first run LeetX imports your LeetCode activity calendar, then counts a day as soon as you get an accepted submission. Days follow your local time zone.
+
+**I removed someone by mistake.** Removed members can't rejoin until the leader opens the squad menu (⋯) and picks **Let removed members rejoin**.

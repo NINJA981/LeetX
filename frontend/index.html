@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LeetX Squads</title>
+  <link rel="stylesheet" href="styles.css">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
+</head>
+
+<body>
+  <div id="app">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-icon">⚡</span>
+        <span class="brand-name">LeetX</span>
+        <span class="brand-sub">SQUADS</span>
+      </div>
+      <div class="utilities">
+        <span class="utility">🔥 1</span>
+        <span class="utility">XP 305</span>
+      </div>
+    </header>
+
+    <nav class="app-nav">
+      <button class="nav-item active" data-page="stats">Stats</button>
+      <button class="nav-item" data-page="squad">Squad</button>
+      <button class="nav-item" data-page="duels">Duels</button>
+      <button class="nav-item" data-page="roadmap">Roadmap</button>
+      <button class="nav-item" data-page="settings">Settings</button>
+    </nav>
+
+    <main id="main-content">
+      <!-- STATS PAGE -->
+      <section id="page-stats" class="page active">
+        <div class="section">
+          <div class="section-head">
+            <h2>TODAY</h2>
+            <span class="streak-label">15 day streak</span>
+          </div>
+          <div class="week-dots">
+            <span class="dot active">M</span>
+            <span class="dot active">T</span>
+            <span class="dot active">W</span>
+            <span class="dot active">T</span>
+            <span class="dot">F</span>
+            <span class="dot">S</span>
+            <span class="dot">S</span>
+          </div>
+        </div>
+
+        <div class="surface-section">
+          <div class="action-info">
+            <span class="meta">#70 Climbing Stairs</span>
+            <span class="secondary-text">Review scheduled for today</span>
+          </div>
+          <button class="btn btn-primary">Review →</button>
+        </div>
+
+        <hr class="section-divider">
+
+        <div class="section">
+          <div class="section-head">
+            <h2>PROGRESS</h2>
+            <span class="total-solved">116 solved</span>
+          </div>
+          <div class="distribution">
+            <div class="dist-row">
+              <span class="diff easy">Easy</span>
+              <div class="bar">
+                <div class="fill" style="width: 100%"></div>
+              </div>
+              <span class="count">71</span>
+            </div>
+            <div class="dist-row">
+              <span class="diff medium">Medium</span>
+              <div class="bar">
+                <div class="fill" style="width: 65%"></div>
+              </div>
+              <span class="count">45</span>
+            </div>
+            <div class="dist-row">
+              <span class="diff hard">Hard</span>
+              <div class="bar">
+                <div class="fill" style="width: 0%"></div>
+              </div>
+              <span class="count">0</span>
+            </div>
+          </div>
+        </div>
+
+        <hr class="section-divider">
+
+        <div class="section">
+          <div class="focus-tag">
+            <span class="meta">Focus:</span> Arrays & Trees
+          </div>
+        </div>
+
+        <div class="section challenge-row">
+          <div>
+            <h2 class="meta-header">NEXT CHALLENGE</h2>
+            <div class="problem-title">Lexicographically Smallest Permutation</div>
+            <span class="diff medium">Medium</span>
+          </div>
+          <button class="btn btn-primary">Solve →</button>
+        </div>
+
+        <div class="github-utility">
+          <span class="status-text">GitHub</span>
+          <span class="status-dot success">Synced</span>
+          <span class="meta">115 solutions</span>
+          <button class="btn-secondary">Sync</button>
+        </div>
+      </section>
+
+      <!-- SQUAD PAGE -->
+      <section id="page-squad" class="page">
+        <div class="section">
+          <div class="room-header">
+            <div class="room-code">#GZZSNR</div>
+            <div class="room-actions">
+              <button class="icon-btn" title="Copy">⧉</button>
+              <button class="icon-btn" title="Refresh">↻</button>
+              <button class="btn-secondary">Leave</button>
+            </div>
+          </div>
+          <div class="join-room">
+            <input type="text" placeholder="Enter squad #CODE">
+            <button class="btn btn-primary">Join Squad</button>
+          </div>
+        </div>
+
+        <div class="surface-section challenge-surface">
+          <div class="section-head">
+            <h2>SQUAD CHALLENGE</h2>
+            <span class="meta">0 / 4</span>
+          </div>
+          <div class="challenge-info">
+            <span class="meta">Solve 4 1-D DP problems</span>
+          </div>
+          <div class="progress-bar">
+            <div class="fill" style="width: 0%"></div>
+          </div>
+          <button class="btn-secondary">Find Matching Problems →</button>
+        </div>
+
+        <hr class="section-divider">
+
+        <div class="section">
+          <h2 class="meta-header">LEADERBOARD</h2>
+          <div class="leaderboard">
+            <div class="rank-item">
+              <span class="rank">#1</span>
+              <span class="user">@NINJA981</span>
+              <span class="status-dot success">Solved</span>
+            </div>
+            <div class="rank-item">
+              <span class="rank">#2</span>
+              <span class="user">@Mano2409</span>
+              <span class="status-dot warning">Pending</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="meta-header">ACTIVITY</h2>
+          <div class="activity-log">
+            <div class="activity-item">
+              <span class="user">@NINJA981</span> solved #Permutation in String
+              <span class="meta">13h ago</span>
+            </div>
+            <div class="activity-item">
+              <span class="user">@NINJA981</span> sent a nudge to @Mano2409
+              <span class="meta">1d ago</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DUELS PAGE -->
+      <section id="page-duels" class="page">
+        <div class="section">
+          <h2 class="meta-header">DUEL</h2>
+          <div class="duel-form">
+            <div class="field">
+              <label>Opponent</label>
+              <select>
+                <option>Select a squad mate...</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Format</label>
+              <select>
+                <option>Blind 75 - Random Problem</option>
+              </select>
+            </div>
+            <button class="btn btn-primary full-width">Start Duel Match</button>
+          </div>
+        </div>
+
+        <hr class="section-divider">
+
+        <div class="section">
+          <h2 class="meta-header">YOUR RECORD</h2>
+          <div class="stat-row">
+            <div class="stat"><span class="value">4</span><span class="label">Won</span></div>
+            <div class="stat"><span class="value">13</span><span class="label">Played</span></div>
+            <div class="stat"><span class="value">31%</span><span class="label">Win Rate</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ROADMAP PAGE -->
+      <section id="page-roadmap" class="page">
+        <div class="section">
+          <div class="section-head">
+            <h2>ROADMAP</h2>
+            <span class="meta">31 / 75 Solved (41%)</span>
+          </div>
+          <div class="progress-bar lg">
+            <div class="fill" style="width: 41%"></div>
+          </div>
+        </div>
+
+        <div class="surface-section challenge-row">
+          <div>
+            <h2 class="meta-header">NEXT FOR YOU</h2>
+            <div class="problem-title">#15 3Sum</div>
+            <span class="meta">Medium · Two Pointers</span>
+          </div>
+          <button class="btn btn-primary">Solve →</button>
+        </div>
+
+        <div class="filter-chips">
+          <button class="chip active">All</button>
+          <button class="chip">Arrays</button>
+          <button class="chip">Pointers</button>
+          <button class="chip">Window</button>
+          <button class="chip">Stack</button>
+          <button class="chip">Binary</button>
+        </div>
+
+        <div class="problem-list">
+          <div class="problem-row">
+            <span class="num">#1</span>
+            <span class="title">Two Sum</span>
+            <span class="diff easy">Easy</span>
+            <div class="row-actions">
+              <button>✎</button>
+              <button>↗</button>
+            </div>
+          </div>
+          <div class="problem-row">
+            <span class="num">#217</span>
+            <span class="title">Contains Duplicate</span>
+            <span class="diff easy">Easy</span>
+            <div class="row-actions">
+              <button>✎</button>
+              <button>↗</button>
+            </div>
+          </div>
+          <div class="problem-row">
+            <span class="num">#242</span>
+            <span class="title">Valid Anagram</span>
+            <span class="diff easy">Easy</span>
+            <div class="row-actions">
+              <button>✎</button>
+              <button>↗</button>
+            </div>
+          </div>
+          <div class="problem-row">
+            <span class="num">#49</span>
+            <span class="title">Group Anagrams</span>
+            <span class="diff medium">Medium</span>
+            <div class="row-actions">
+              <button>✎</button>
+              <button>↗</button>
+            </div>
+          </div>
+          <div class="problem-row">
+            <span class="num">#347</span>
+            <span class="title">Top K Frequent Elements</span>
+            <span class="diff medium">Medium</span>
+            <div class="row-actions">
+              <button>✎</button>
+              <button>↗</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS PAGE -->
+      <section id="page-settings" class="page">
+        <div class="section">
+          <h2 class="meta-header">APPEARANCE</h2>
+          <div class="field">
+            <label>Theme</label>
+            <div class="theme-selector">
+              <button class="btn-primary">Light</button>
+              <button class="btn-secondary">Dark</button>
+              <button class="btn-secondary">LeetX</button>
+            </div>
+          </div>
+        </div>
+
+        <hr class="section-divider">
+
+        <div class="section">
+          <h2 class="meta-header">USER PROFILE</h2>
+          <div class="field">
+            <label>Squad display name</label>
+            <input type="text" value="NINJA981">
+          </div>
+          <div class="field">
+            <label>LeetCode username</label>
+            <input type="text" value="AH0CQLRCsa">
+          </div>
+        </div>
+
+        <hr class="section-divider">
+
+        <div class="section">
+          <h2 class="meta-header">GITHUB</h2>
+          <div class="github-config">
+            <div class="status-row">
+              <span class="status-dot success">Connected</span>
+              <span class="meta">NINJA981/leetcode-submissions</span>
+            </div>
+            <div class="github-actions">
+              <button class="btn btn-primary">Sync All Solutions</button>
+              <button class="btn-secondary danger-text">Disconnect</button>
+            </div>
+            <span class="success-text">✓ 115 solutions synced</span>
+          </div>
+        </div>
+
+        <hr class="section-divider">
+
+        <div class="section">
+          <h2 class="meta-header">DATA</h2>
+          <div class="danger-zone">
+            <button class="btn-secondary danger-text">Reset local progress</button>
+            <button class="btn-secondary danger-text">Clear cached data</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
