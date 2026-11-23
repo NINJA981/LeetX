@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LeetX Squads: Sync & Multiplayer DSA",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Keep a daily LeetCode streak with friends: squads, 1v1 duels, reminders, roadmaps and automatic GitHub backup.",
   "minimum_chrome_version": "116",
   "browser_specific_settings": {
@@ -17,7 +17,8 @@
     "storage",
     "alarms",
     "notifications",
-    "cookies"
+    "cookies",
+    "identity"
   ],
   "host_permissions": [
     "https://leetcode.com/*",

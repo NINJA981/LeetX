@@ -29,7 +29,7 @@ class TestManifest(unittest.TestCase):
 
     def test_least_privilege(self):
         perms = set(self.manifest["permissions"])
-        self.assertEqual(perms, {"storage", "alarms", "notifications", "cookies"})
+        self.assertEqual(perms, {"storage", "alarms", "notifications", "cookies", "identity"})
         hosts = self.manifest["host_permissions"]
         self.assertNotIn("<all_urls>", hosts)
         self.assertTrue(all(h.startswith("https://") for h in hosts))

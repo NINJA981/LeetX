@@ -20,3 +20,6 @@ scratch/
 
 # The landing page is its own repo (NINJA981/leetx-landing-page)
 LeetX landing page/
+
+# Local browser-automation output
+.playwright-mcp/

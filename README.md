@@ -45,7 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/NINJA981/LeetX/main/install.sh | ba
 
 1. Sign in to [leetcode.com](https://leetcode.com) in the same browser.
 2. Open the LeetX popup → **Get started**.
-3. *(Optional)* Connect GitHub: click **Open GitHub**, generate a token with the `repo` scope, and paste it. LeetX creates `leetcode-submissions` (private unless you switch it off) and backfills your accepted solutions. Fine-grained tokens work too if they have **Contents** and **Administration** write access.
+3. *(Optional)* Connect GitHub: click **Connect with GitHub** and approve access. LeetX creates `leetcode-submissions` (private unless you switch it off) and backfills your accepted solutions. Prefer a token? Open **Use a personal access token instead** and paste one with the `repo` scope (fine-grained tokens work with **Contents** and **Administration** write access).
 4. Solve something. You'll see a confirmation on the LeetCode page and your streak updates on the toolbar.
 
 ## Privacy
@@ -53,7 +53,7 @@ curl -fsSL https://raw.githubusercontent.com/NINJA981/LeetX/main/install.sh | ba
 | Data | Where it goes |
 | --- | --- |
 | Your code, notes and runtime stats | Only to **your** GitHub repository, via `api.github.com` |
-| GitHub token | Stays in this browser's extension storage |
+| GitHub token | Stays in this browser's extension storage. During one-click sign-in it passes once through a small Cloudflare Worker (`auth-worker/`) that holds the OAuth client secret; the Worker does not store it. Sign-in asks for the `repo` scope, so use the personal-access-token option with a fine-grained token if you want narrower access. |
 | Display name, streak, solve counts, titles of problems you solve, duel results | Your squad, via Firebase. Only members of your squad can read it. |
 | Everything else (history, XP, notes, reviews) | Stays in this browser |
 

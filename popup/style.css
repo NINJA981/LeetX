@@ -1438,3 +1438,7 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
+
+.connect-form .advanced { margin-top: var(--space-3, 12px); display: grid; gap: 8px; }
+.connect-form .advanced summary { cursor: pointer; font-size: 12px; color: var(--text-3, var(--muted, #888)); }
+.connect-form .advanced[open] summary { margin-bottom: 4px; }

@@ -22,6 +22,7 @@ leetcode.com tab                     background worker                         s
 | --- | --- |
 | `scripts/core.js` | Pure logic shared everywhere: dates, streak maths, XP/levels, challenge catalog and matching, squad codes. Fully unit-tested. |
 | `scripts/state.js` | `chrome.storage.local` helpers: defaults, v1 → v2 migration, profile, de-duplicated XP awards, duel record. |
+| `auth-worker/` | Cloudflare Worker (`leetx-auth`) that brokers GitHub OAuth so the client secret never ships in the extension. `/login` validates the extension redirect URL (`*.chromiumapp.org` or Firefox extension hosts), signs a short-lived `state`, and sends the user to GitHub; `/callback` verifies the state, exchanges the code and returns the token to the extension in the URL fragment. Secrets: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `STATE_SECRET`. The popup calls it through `chrome.identity.launchWebAuthFlow`. |
 | `scripts/firebase.js` | Anonymous Auth (token refresh, cross-context race handling), a small Firestore REST client (masks, `:commit` preconditions, queries) and the `Squads` / `Duels` APIs. |
 | `scripts/leetcode.js` | GraphQL client using the user's own session. Paginates history with `lastKey` and backs off on HTTP 429. |
 | `scripts/github.js` | Git Data API commits (fast-forward only, retried on 422), placeholder detection, README catalog. |
