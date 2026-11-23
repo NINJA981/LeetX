@@ -70,6 +70,19 @@ jobs:
       - name: Package extensions
         run: python scripts/package.py
 
+      - name: Checksum and sign
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          cd dist
+          sha256sum leetx-*.zip > SHA256SUMS
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --yes --pinentry-mode loopback --passphrase '' --detach-sign -o SHA256SUMS.sig SHA256SUMS
+          # Fail the release if the committed public key cannot verify what we just signed.
+          export GNUPGHOME="$(mktemp -d)"
+          gpg --batch --import ../RELEASE_KEY.asc
+          gpg --batch --verify SHA256SUMS.sig SHA256SUMS
+
       - uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -77,4 +90,6 @@ jobs:
             dist/leetx-firefox-v*.zip
             dist/leetx-chrome.zip
             dist/leetx-firefox.zip
+            dist/SHA256SUMS
+            dist/SHA256SUMS.sig
           generate_release_notes: true

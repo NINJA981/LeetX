@@ -48,6 +48,16 @@ curl -fsSL https://raw.githubusercontent.com/NINJA981/LeetX/main/install.sh | ba
 3. *(Optional)* Connect GitHub: click **Connect with GitHub** and approve access. LeetX creates `leetcode-submissions` (private unless you switch it off) and backfills your accepted solutions. Prefer a token? Open **Use a personal access token instead** and paste one with the `repo` scope (fine-grained tokens work with **Contents** and **Administration** write access).
 4. Solve something. You'll see a confirmation on the LeetCode page and your streak updates on the toolbar.
 
+## Verify a download
+
+Each release includes `SHA256SUMS` and a detached signature, `SHA256SUMS.sig`, made with the key in [`RELEASE_KEY.asc`](RELEASE_KEY.asc) (fingerprint `91F8 EFCF C879 066E 8F46  01CD A0B7 11E9 F186 6B30`).
+
+```bash
+gpg --import RELEASE_KEY.asc
+gpg --verify SHA256SUMS.sig SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
 ## Privacy
 
 | Data | Where it goes |
