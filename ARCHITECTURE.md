@@ -27,7 +27,7 @@ leetcode.com tab                     background worker                         s
 | `scripts/github.js` | Git Data API commits (fast-forward only, retried on 422), placeholder detection, README catalog. |
 | `scripts/background.js` | The solve pipeline, badge, reminders, squad polling and the serialized GitHub queue. |
 | `scripts/content.js` | Detects accepted submissions and renders feedback inside a closed shadow root, using `textContent` only. |
-| `popup/` | `app.js` (shell, routing, live updates), `ui.js` (DOM builder, icons, components), `views/*` (one module per screen), `style.css` (design tokens and four themes). |
+| `popup/` | `app.js` (shell, routing, live updates), `ui.js` (DOM builder, icons, components), `views/*` (one module per screen), `style.css` (design tokens, light/dark/neon themes, bundled Schibsted Grotesk + JetBrains Mono in `assets/fonts/`; see `DESIGN_PLAN.md`). |
 
 ## Solve pipeline
 

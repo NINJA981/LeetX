@@ -238,9 +238,44 @@ export function confirmButton(label, confirmLabel, onConfirm, opts = {}) {
     }
     clearTimeout(timer);
     btn.disabled = true;
-    try { await onConfirm(); } finally { btn.disabled = false; }
+    try {
+      await onConfirm();
+    } catch (err) {
+      console.warn('[LeetX]', err);
+      toast(err?.message || 'Something went wrong', { tone: 'error' });
+    } finally {
+      btn.disabled = false;
+    }
   });
   return btn;
+}
+
+/**
+ * In-app replacement for window.confirm(): a themed bottom sheet.
+ * Resolves true on confirm, false on cancel, Escape or backdrop click.
+ */
+export function confirmDialog({ title, body = null, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false }) {
+  return new Promise(resolve => {
+    const finish = value => {
+      sheet.classList.remove('in');
+      backdrop.classList.remove('in');
+      setTimeout(() => backdrop.remove(), 200);
+      resolve(value);
+    };
+    const cancelBtn = button(cancelLabel, { variant: 'secondary', onclick: () => finish(false) });
+    const sheet = h('div.sheet.sheet-confirm', { role: 'alertdialog', 'aria-modal': 'true', 'aria-label': title },
+      h('div.sheet-grip'),
+      h('h2.sheet-title', title),
+      body ? h('p.muted', body) : null,
+      h('div.confirm-actions', cancelBtn, button(confirmLabel, { variant: danger ? 'danger' : 'primary', onclick: () => finish(true) })),
+    );
+    const backdrop = h('div.sheet-backdrop', sheet);
+    backdrop.addEventListener('click', e => { if (e.target === backdrop) finish(false); });
+    backdrop.addEventListener('close', () => finish(false));
+    document.getElementById('app').appendChild(backdrop);
+    requestAnimationFrame(() => { backdrop.classList.add('in'); sheet.classList.add('in'); });
+    cancelBtn.focus({ preventScroll: true });
+  });
 }
 
 /** Wrap an async click handler: disables the button and shows errors as a toast. */

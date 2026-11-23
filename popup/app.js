@@ -157,7 +157,7 @@ async function render() {
   const scrollTop = document.getElementById('view')?.scrollTop || 0;
   const sameView = app.dataset.view === store.view;
   const tabId = TABS.find(t => t.id === store.view || (t.also || []).includes(store.view))?.id || store.view;
-  const view = h('main#view.view', { role: 'tabpanel', 'aria-labelledby': `tab-${tabId}`, tabIndex: -1 });
+  const view = h(`main#view.view${sameView ? '' : '.is-entering'}`, { role: 'tabpanel', 'aria-labelledby': `tab-${tabId}`, tabIndex: -1 });
   const content = await VIEWS[store.view](ctx);
   mount(view, content);
 

@@ -97,7 +97,7 @@ function thisWeek(data, d) {
       ),
       h('div.week-bars', { role: 'img', 'aria-label': days.map((x, i) => `${DAY_LABELS[i]} ${x.n}`).join(', ') },
         days.map((x, i) => h(`div.week-bar${x.key === d.today ? '.is-today' : ''}${x.future ? '.is-future' : ''}`,
-          h('span.week-bar-fill', { style: { height: `${x.n ? Math.max(12, (x.n / max) * 100) : 0}%` }, title: `${x.n} solved` }),
+          h(`span.week-bar-fill${x.n ? '' : '.is-zero'}`, { style: { height: `${x.n ? Math.max(12, (x.n / max) * 100) : 0}%` }, title: `${x.n} solved` }),
           h('span.week-bar-label', DAY_LABELS[i]),
         )),
       ),

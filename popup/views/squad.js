@@ -2,7 +2,7 @@ import { MAX_SQUAD_MEMBERS, formatTimeAgo, getCatalogEntry, toDateKey } from '..
 import { Squads, SquadError } from '../../scripts/firebase.js';
 import { getProfile } from '../../scripts/state.js';
 import {
-  avatar, busy, button, confirmButton, emptyState, h, icon, iconButton, mount, sectionHeader, segmented, skeleton, toast,
+  avatar, busy, button, confirmButton, confirmDialog, emptyState, h, icon, iconButton, mount, sectionHeader, segmented, skeleton, toast,
 } from '../ui.js';
 
 /** Members / Duels switch shown at the top of both squad screens. */
@@ -215,9 +215,13 @@ function openMenu(anchor, ctx, code, snap, members) {
     }
   }
   items.push(item('Leave squad', 'logOut', async () => {
-    if (!confirm(snap.isOwner && members.length > 1
-      ? 'Leave this squad? Leadership passes to the most active member.'
-      : 'Leave this squad?')) return;
+    const ok = await confirmDialog({
+      title: 'Leave this squad?',
+      body: snap.isOwner && members.length > 1 ? 'Leadership passes to the most active member.' : 'You can rejoin later with the squad code.',
+      confirmLabel: 'Leave squad',
+      danger: true,
+    });
+    if (!ok) return;
     await Squads.leaveSquad(code, await getProfile());
     delete ctx.store.data.my_squad_code;
     toast('You left the squad');

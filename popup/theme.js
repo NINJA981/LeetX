@@ -1,8 +1,18 @@
-/** Applies the theme and caches it for the synchronous boot script (theme-boot.js). */
+/** Applies the theme and caches the preference for the synchronous boot script (theme-boot.js). */
 export const THEMES = ['system', 'light', 'dark', 'neon'];
 
+const scheme = window.matchMedia('(prefers-color-scheme: dark)');
+let preference = 'system';
+
+function paint() {
+  document.documentElement.dataset.theme = preference === 'system' ? (scheme.matches ? 'dark' : 'light') : preference;
+}
+
+// Follow the OS while the popup is open and the preference is "system".
+scheme.addEventListener('change', () => { if (preference === 'system') paint(); });
+
 export function applyTheme(theme) {
-  const value = THEMES.includes(theme) ? theme : 'system';
-  document.documentElement.dataset.theme = value;
-  try { localStorage.setItem('leetx_theme', value); } catch { /* storage disabled */ }
+  preference = THEMES.includes(theme) ? theme : 'system';
+  paint();
+  try { localStorage.setItem('leetx_theme', preference); } catch { /* storage disabled */ }
 }

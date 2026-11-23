@@ -89,7 +89,7 @@ function streakHero(ctx, d) {
       ),
     ),
     goalRing(d),
-    weekStrip(data.solve_history, d),
+    weekStrip(data.solve_history, d, { risk, grew }),
   );
 }
 
@@ -119,20 +119,29 @@ function goalRing(d) {
   );
 }
 
-function weekStrip(history = {}, d) {
+/** A solved or frozen day keeps the streak line unbroken. */
+function weekStrip(history = {}, d, { risk = false, grew = false } = {}) {
   const todayDate = fromDateKey(d.today);
   const monday = shiftDateKey(d.today, -((todayDate.getDay() + 6) % 7));
-  return h('ol.week', { 'aria-label': 'This week' },
-    WEEKDAYS.map((label, i) => {
-      const key = shiftDateKey(monday, i);
-      const done = (history[key] || 0) > 0;
-      const frozen = !done && d.frozenDays.has(key);
-      let state = key === d.today ? (done ? 'done today' : 'today') : key > d.today ? 'future' : done ? 'done' : 'missed';
-      if (frozen) state = 'frozen';
-      const title = `${fromDateKey(key).toDateString()}${done ? ` · ${history[key]} solved` : frozen ? ' · covered by a streak freeze' : ''}`;
-      return h(`li.week-day.${state.split(' ').join('.')}`, { title },
-        h('span.week-label', label),
-        h('span.week-cell', done ? icon('check', { size: 12 }) : frozen ? icon('snowflake', { size: 12 }) : null),
+  const days = WEEKDAYS.map((label, i) => {
+    const key = shiftDateKey(monday, i);
+    const done = (history[key] || 0) > 0;
+    const frozen = !done && d.frozenDays.has(key);
+    const isToday = key === d.today;
+    const state = frozen ? 'frozen' : done ? (isToday ? 'done today' : 'done') : isToday ? 'today' : key > d.today ? 'future' : 'missed';
+    return { label, key, done, frozen, isToday, state, kept: done || frozen };
+  });
+
+  return h(`ol.week${grew ? '.is-drawing' : ''}`, { 'aria-label': 'This week' },
+    days.map((day, i) => {
+      const prev = days[i - 1];
+      const classes = [day.state.split(' ').join('.')];
+      if (prev?.kept && day.kept) classes.push('link', ...(prev.frozen || day.frozen ? ['is-ice'] : []));
+      else if (prev?.kept && day.isToday) classes.push('pending', ...(risk ? ['is-risk'] : []));
+      const title = `${fromDateKey(day.key).toDateString()}${day.done ? ` · ${history[day.key]} solved` : day.frozen ? ' · covered by a streak freeze' : ''}`;
+      return h(`li.week-day.${classes.join('.')}`, { title },
+        h('span.week-label', day.label),
+        h('span.week-cell', day.done ? icon('check', { size: 12 }) : day.frozen ? icon('snowflake', { size: 12 }) : null),
       );
     }),
   );

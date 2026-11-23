@@ -3,7 +3,7 @@ import { Duels, Squads } from '../../scripts/firebase.js';
 import { LeetCodeAPI } from '../../scripts/leetcode.js';
 import { duelRecord, getProfile, recordDuelOutcome } from '../../scripts/state.js';
 import {
-  avatar, busy, button, emptyState, h, icon, mount, openExternal, problemUrl, sectionHeader, segmented, skeleton, toast,
+  avatar, busy, button, confirmButton, emptyState, h, icon, mount, openExternal, problemUrl, sectionHeader, segmented, skeleton, toast,
 } from '../ui.js';
 import { squadSwitch } from './squad.js';
 
@@ -137,16 +137,11 @@ async function arena(ctx, duel, uid) {
     h('p.arena-note', 'First accepted submission wins. LeetX detects it automatically.'),
     h('div.arena-actions',
       problem ? button('Open problem', { variant: 'primary', iconRight: 'external', onclick: () => openExternal(problemUrl(problem.slug)) }) : null,
-      button('Forfeit', {
-        variant: 'ghost',
-        iconName: 'flag',
-        onclick: busy(async () => {
-          if (!confirm(`Forfeit and give ${opponent} the win?`)) return;
-          await Duels.forfeit(duel, await getProfile());
-          toast('Duel forfeited');
-          ctx.rerender();
-        }),
-      }),
+      confirmButton('Forfeit', `Give ${opponent} the win?`, async () => {
+        await Duels.forfeit(duel, await getProfile());
+        toast('Duel forfeited');
+        ctx.rerender();
+      }, { iconName: 'flag' }),
     ),
   );
 }
