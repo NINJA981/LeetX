@@ -398,3 +398,26 @@ describe('isNewerVersion', async () => {
     assert.equal(isNewerVersion('2.1', '2.0.0'), false);
   });
 });
+
+describe('backup', async () => {
+  const { buildBackup, parseBackup } = await import('../scripts/core.js');
+  it('leaves out the GitHub token and caches but keeps progress and squad identity', () => {
+    const b = buildBackup({ github_token: 'gho_x', sync_status: {}, squad_cache: {}, user_xp: 40, fb_session: { uid: 'u' }, notes_two_sum: 'n' }, { version: '2.1.3', now: 0 });
+    assert.deepEqual(Object.keys(b.data).sort(), ['fb_session', 'notes_two_sum', 'user_xp']);
+    assert.equal(b.exported_at, '1970-01-01T00:00:00.000Z');
+  });
+  it('round-trips through parseBackup', () => {
+    const b = buildBackup({ user_xp: 40, solve_history: { '2026-11-24': 2 } }, { version: '2.1.3' });
+    assert.deepEqual(parseBackup(JSON.stringify(b)).data, b.data);
+  });
+  it('drops secrets even if a hand-edited file contains them', () => {
+    const text = JSON.stringify({ format: 'leetx-backup', schema: 1, data: { github_token: 'gho_x', user_xp: 1 } });
+    assert.deepEqual(parseBackup(text).data, { user_xp: 1 });
+  });
+  it('rejects bad files with a readable message', () => {
+    assert.throws(() => parseBackup('nope'), /not valid JSON/);
+    assert.throws(() => parseBackup('{"a":1}'), /not a LeetX backup/);
+    assert.throws(() => parseBackup(JSON.stringify({ format: 'leetx-backup', schema: 2, data: {} })), /newer LeetX/);
+    assert.throws(() => parseBackup(JSON.stringify({ format: 'leetx-backup', schema: 1, data: {} })), /no data/);
+  });
+});

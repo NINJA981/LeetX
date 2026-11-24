@@ -1,6 +1,6 @@
 {
   "name": "leetx-squads",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "private": true,
   "description": "LeetX Squads browser extension - development tooling only (the extension itself ships without a build step).",
   "type": "module",

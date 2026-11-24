@@ -1,9 +1,9 @@
-import { sanitizeName } from '../../scripts/core.js';
+import { buildBackup, parseBackup, sanitizeName } from '../../scripts/core.js';
 import { Squads } from '../../scripts/firebase.js';
 import { getProfile } from '../../scripts/state.js';
 import { applyTheme } from '../theme.js';
 import {
-  busy, button, confirmButton, h, icon, iconButton, openExternal, segmented, toast, toggle,
+  busy, button, confirmButton, confirmDialog, h, icon, iconButton, openExternal, segmented, toast, toggle,
 } from '../ui.js';
 import { githubConnectForm } from './github-connect.js';
 
@@ -98,6 +98,13 @@ export async function renderSettings(ctx) {
       ),
     ),
 
+    group('Backup',
+      row('Export backup', 'Saves your progress, notes and squad identity to a file. Keep it private. It does not include your GitHub token.',
+        button('Export', { size: 'sm', onclick: busy(exportBackup) })),
+      row('Import backup', 'Restores a backup file on this device, replacing matching data. Opens in a tab so the file picker works.',
+        button('Import', { size: 'sm', onclick: () => importBackup(ctx) })),
+    ),
+
     group('Data',
       row('Reset local progress', 'Clears streak history, XP and duel record on this device',
         confirmButton('Reset', 'Tap to confirm', async () => {
@@ -189,4 +196,52 @@ function formatHour(hour) {
   const d = new Date();
   d.setHours(hour, 0, 0, 0);
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+// ---------------------------------------------------------------------------
+// Backup & restore
+// ---------------------------------------------------------------------------
+
+async function exportBackup() {
+  const backup = buildBackup(await chrome.storage.local.get(null), { version: chrome.runtime.getManifest().version });
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup)], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `leetx-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  toast('Backup saved to your downloads', { tone: 'success' });
+}
+
+function importBackup(ctx) {
+  // A file picker can close the toolbar popup before a file is chosen, so do the import from a full tab.
+  if (!new URLSearchParams(location.search).has('tab')) {
+    chrome.tabs.create({ url: chrome.runtime.getURL('popup/index.html?tab=1') });
+    return;
+  }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      const { data, exportedAt } = parseBackup(await file.text());
+      const when = exportedAt ? ` from ${exportedAt.slice(0, 10)}` : '';
+      const ok = await confirmDialog({
+        title: 'Restore this backup?',
+        body: `This replaces matching progress on this device with the backup${when}. Reconnect GitHub afterwards.`,
+        confirmLabel: 'Restore',
+      });
+      if (!ok) return;
+      await chrome.storage.local.set(data);
+      toast('Backup restored', { tone: 'success' });
+      ctx.rerender();
+    } catch (err) {
+      toast(err.message || 'Could not read that backup.', { tone: 'error' });
+    }
+  });
+  input.click();
 }

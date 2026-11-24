@@ -16,6 +16,44 @@ export function isNewerVersion(latest, current) {
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Backup & restore
+// ---------------------------------------------------------------------------
+
+export const BACKUP_FORMAT = 'leetx-backup';
+export const BACKUP_MAX_BYTES = 5 * 1024 * 1024;
+/** Never exported or imported: secrets that belong to this install, and caches that rebuild themselves. */
+const BACKUP_EXCLUDED = new Set([
+  'github_token', 'github_last_error', 'github_last_commit', 'github_pending', 'sync_status',
+  'update_info', 'dismissed_update', 'squad_cache',
+]);
+
+/** Snapshot of chrome.storage.local contents as a portable object. */
+export function buildBackup(storage, { version, now = Date.now() } = {}) {
+  const data = {};
+  for (const [key, value] of Object.entries(storage || {})) {
+    if (!BACKUP_EXCLUDED.has(key) && value !== undefined) data[key] = value;
+  }
+  return { format: BACKUP_FORMAT, schema: 1, app_version: version || null, exported_at: new Date(now).toISOString(), data };
+}
+
+/** Validate backup JSON text and return `{ data, appVersion, exportedAt }`. Throws an Error with a user-facing message. */
+export function parseBackup(text) {
+  if (typeof text !== 'string' || text.length > BACKUP_MAX_BYTES) throw new Error('That file is too large to be a LeetX backup.');
+  let parsed;
+  try { parsed = JSON.parse(text); } catch { throw new Error('That file is not valid JSON.'); }
+  if (!parsed || parsed.format !== BACKUP_FORMAT) throw new Error('That is not a LeetX backup file.');
+  if (parsed.schema !== 1) throw new Error('This backup was made by a newer LeetX. Update LeetX and try again.');
+  if (!parsed.data || typeof parsed.data !== 'object' || Array.isArray(parsed.data)) throw new Error('The backup has no data in it.');
+  const data = {};
+  for (const [key, value] of Object.entries(parsed.data)) {
+    if (key === '__proto__' || BACKUP_EXCLUDED.has(key)) continue;
+    data[key] = value;
+  }
+  if (!Object.keys(data).length) throw new Error('The backup has no data in it.');
+  return { data, appVersion: parsed.app_version || null, exportedAt: parsed.exported_at || null };
+}
+
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
