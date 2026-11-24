@@ -6,7 +6,7 @@
 
 import { computeStreak, levelFromXp, msUntilMidnight, toDateKey } from '../scripts/core.js';
 import { applyDefaults, applyFreezesToStorage, migrateLegacyState, recordAchievements } from '../scripts/state.js';
-import { h, icon, iconButton, mount, toast } from './ui.js';
+import { button, h, icon, iconButton, mount, openExternal, toast } from './ui.js';
 import { renderToday } from './views/today.js';
 import { renderProgress } from './views/progress.js';
 import { renderSquad } from './views/squad.js';
@@ -103,6 +103,21 @@ function renderHeader() {
   );
 }
 
+function renderUpdateBanner() {
+  const info = store.data.update_info;
+  if (!info?.available || store.data.dismissed_update === info.latest) return null;
+  return h('section.update-banner', { role: 'status' },
+    h('div.update-text',
+      h('strong', `LeetX ${info.latest} is available`),
+      h('span', 'Replace the files in your current LeetX folder, then click ↻ on its card at chrome://extensions. Loading a new folder resets your data.'),
+    ),
+    h('div.update-actions',
+      button('Get update', { size: 'sm', variant: 'primary', iconRight: 'external', onclick: () => openExternal(info.url) }),
+      iconButton('x', 'Dismiss', { onclick: () => chrome.storage.local.set({ dismissed_update: info.latest }) }),
+    ),
+  );
+}
+
 function renderTabs() {
   const nav = h('nav.tabs', { role: 'tablist', 'aria-label': 'Sections' });
   TABS.forEach((tab, index) => {
@@ -163,6 +178,7 @@ async function render() {
 
   mount(app,
     renderHeader(),
+    renderUpdateBanner(),
     store.view === 'settings' ? null : renderTabs(),
     view,
     h('div#toast-region.toast-region', { 'aria-live': 'polite' }),
@@ -198,7 +214,7 @@ const RERENDER_KEYS = new Set([
   'solve_history', 'user_xp', 'user_solved_slugs', 'total_solved', 'solved_easy_count', 'solved_med_count',
   'solved_hard_count', 'lc_calendar', 'sync_status', 'github_token', 'github_repo_owner', 'my_squad_code',
   'daily_goal', 'duel_history', 'current_duel_id', 'review_schedule', 'onboarded', 'github_last_error',
-  'frozen_days', 'streak_freezes', 'achievements', 'checklist_dismissed',
+  'frozen_days', 'streak_freezes', 'achievements', 'checklist_dismissed', 'update_info', 'dismissed_update',
 ]);
 
 chrome.storage.onChanged.addListener((changes, area) => {

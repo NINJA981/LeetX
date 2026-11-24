@@ -1442,3 +1442,17 @@ kbd {
 .connect-form .advanced { margin-top: var(--space-3, 12px); display: grid; gap: 8px; }
 .connect-form .advanced summary { cursor: pointer; font-size: 12px; color: var(--text-3, var(--muted, #888)); }
 .connect-form .advanced[open] summary { margin-bottom: 4px; }
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md, 10px);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.update-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-meta); color: var(--text-2); }
+.update-text strong { font-size: var(--fs-body); color: var(--text-1, inherit); }
+.update-actions { display: flex; align-items: center; gap: 4px; flex: none; }

@@ -383,3 +383,18 @@ describe('achievements & mastery', async () => {
     assert.equal(median([]), null);
   });
 });
+
+describe('isNewerVersion', async () => {
+  const { isNewerVersion } = await import('../scripts/core.js');
+  it('compares x.y.z numerically', () => {
+    assert.equal(isNewerVersion('v2.1.1', '2.1.0'), true);
+    assert.equal(isNewerVersion('2.10.0', '2.9.9'), true);
+    assert.equal(isNewerVersion('2.1.1', '2.1.1'), false);
+    assert.equal(isNewerVersion('2.0.9', '2.1.0'), false);
+  });
+  it('ignores malformed versions', () => {
+    assert.equal(isNewerVersion('', '2.1.0'), false);
+    assert.equal(isNewerVersion('latest', '2.1.0'), false);
+    assert.equal(isNewerVersion('2.1', '2.0.0'), false);
+  });
+});

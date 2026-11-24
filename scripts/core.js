@@ -4,6 +4,18 @@
  * and challenge matching are computed identically everywhere.
  */
 
+/** True when `latest` ("v2.1.1" or "2.1.1") is a newer x.y.z than `current`. Non-numeric input is never newer. */
+export function isNewerVersion(latest, current) {
+  const parse = v => String(v || '').trim().replace(/^v/i, '').split('.').map(n => Number.parseInt(n, 10));
+  const a = parse(latest);
+  const b = parse(current);
+  if (a.length < 3 || b.length < 3 || [...a.slice(0, 3), ...b.slice(0, 3)].some(Number.isNaN)) return false;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] > b[i];
+  }
+  return false;
+}
+
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ---------------------------------------------------------------------------

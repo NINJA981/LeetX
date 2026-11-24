@@ -9,6 +9,7 @@ import {
   computeStreak,
   earnsFreeze,
   formatDuration,
+  isNewerVersion,
   isReviewDue,
   isStreakMilestone,
   newReviewEntry,
@@ -42,6 +43,8 @@ import {
 
 const ALARM_TICK = 'leetx_tick';
 const ALARM_SQUAD = 'leetx_squad_poll';
+const ALARM_UPDATE = 'leetx_update_check';
+const RELEASES_API = 'https://api.github.com/repos/NINJA981/LeetX/releases/latest';
 const LEETCODE_ORIGIN = 'https://leetcode.com/';
 const BADGE = { done: '#15803D', pending: '#B45309', risk: '#B91C1C' };
 
@@ -52,12 +55,35 @@ const BADGE = { done: '#15803D', pending: '#B45309', risk: '#B91C1C' };
 async function ensureAlarms() {
   if (!(await chrome.alarms.get(ALARM_TICK))) chrome.alarms.create(ALARM_TICK, { periodInMinutes: 15, delayInMinutes: 1 });
   if (!(await chrome.alarms.get(ALARM_SQUAD))) chrome.alarms.create(ALARM_SQUAD, { periodInMinutes: 1, delayInMinutes: 1 });
+  if (!(await chrome.alarms.get(ALARM_UPDATE))) chrome.alarms.create(ALARM_UPDATE, { periodInMinutes: 12 * 60, delayInMinutes: 2 });
+}
+
+/** Ask GitHub for the latest release and remember whether it is newer than this install. Failures are silent. */
+async function checkForUpdate() {
+  try {
+    const res = await fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    if (!res.ok) return;
+    const release = await res.json();
+    const latest = String(release.tag_name || '').replace(/^v/i, '');
+    if (!latest) return;
+    await chrome.storage.local.set({
+      update_info: {
+        latest,
+        available: isNewerVersion(latest, chrome.runtime.getManifest().version),
+        url: release.html_url || 'https://github.com/NINJA981/LeetX/releases/latest',
+        checkedAt: Date.now(),
+      },
+    });
+  } catch (err) {
+    console.warn('[LeetX] update check', err);
+  }
 }
 
 async function bootstrap() {
   await migrateLegacyState();
   await applyDefaults();
   await ensureAlarms();
+  checkForUpdate();
   await spendFreezes();
   await refreshBadge();
   await rejoinMigratedSquad();
@@ -105,6 +131,8 @@ chrome.alarms.onAlarm.addListener(async alarm => {
       await maybeRemindContest();
     } else if (alarm.name === ALARM_SQUAD) {
       await pollSquadEvents();
+    } else if (alarm.name === ALARM_UPDATE) {
+      await checkForUpdate();
     }
   } catch (err) {
     console.warn(`[LeetX] alarm ${alarm.name}`, err);
